@@ -62,6 +62,19 @@ void SpeedPlanOffline()
 		interval_length_cm, speed_limit_location, speed_limit, limit_num, target_time_offline, solution_num);
 	UINT32 finish = clock();
 	printf("求解结束，计算用时： % d ms\n", (finish - start) / 1000);
+	free(gradient);
+	free(curve_radius);
+	free(speed_limit_location);
+	free(speed_limit);
+	free(speed_curve_offline);
+	free(tartget_speed_curve);
+	free(speed_limit_max);
+	free(speed_limit_min);
+	free(speed_limit_mmax);
+	free(level_output_flag);
+	free(plan_time);
+
+
 }
 
 
@@ -174,7 +187,6 @@ UINT16 GetOptimalSpeedOffline(UINT16* speed_curve, UINT16 discrete_size, UINT16*
 	free(upper_bound);
 	free(switch_flag);
 	return dim;
-
 }
 
 
@@ -472,6 +484,11 @@ void GWO_Offline(UINT16* optimal_speed, UINT16* speed_limit_max, UINT16* speed_l
 	{
 		optimal_speed[i] = OptimalSpd[i];
 	}
+
+	//释放内存
+	for (int i = 0; i < wolves_num; i++)
+		free(Positions[i]);
+	free(Positions);
 	free(OptimalSpd);
 
 
