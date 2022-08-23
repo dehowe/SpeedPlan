@@ -1,887 +1,1200 @@
 #include "SpeedPlan.h"
 
-TRAIN_PARAMETER				g_train_param;						// ÁĞ³µ²ÎÊı
-UINT16						g_aw_id;							// ÔØºÉ
-LINE_PARAMETER              g_line_param;                       // ÏßÂ·²ÎÊı
-/*ËÙ¶È¹æ»®Ïà¹Ø±äÁ¿*/
-FLOAT32* gradient = NULL;						 // ³õÊ¼»¯Çø¼äÆÂ¶È´æ´¢Ö¸Õë;
-UINT32* curve_radius = NULL;					 // ³õÊ¼»¯Çø¼äÇúÏß°ë¾¶´æ´¢Ö¸Õë;
-UINT32* speed_limit_location = NULL;			 // ³õÊ¼»¯ÏŞËÙ×ª»»µãÎ»ÖÃ´æ´¢Ö¸Õë;
-UINT16* speed_limit = NULL;						 // ³õÊ¼»¯ÏŞËÙ×ª»»µãÏŞËÙ´æ´¢Ö¸Õë;
-UINT16* speed_curve_offline = NULL;				 // ³õÊ¼»¯ÀëÏßÓÅ»¯ËÙ¶È´æ´¢Ö¸Õë;
-UINT16* tartget_speed_curve = NULL;				 // ³õÊ¼»¯ÓÅ»¯ËÙ¶È´æ´¢Ö¸Õë;
-UINT16* speed_limit_max = NULL;					 // ³õÊ¼»¯×î¿ìËÙ¶È´æ´¢Ö¸Õë;
-UINT16* speed_limit_min = NULL;					 // ³õÊ¼»¯×îĞ¡ËÙ¶È´æ´¢Ö¸Õë;
-UINT16* speed_limit_mmax = NULL;				 // ³õÊ¼»¯¶¥ÅïÏŞËÙ´æ´¢Ö¸Õë;
-UINT16* level_output_flag = NULL;				 // ³õÊ¼»¯¼¶Î»Êä³ö±êÊ¶1£ºÇ£Òı£»2£º¶èĞĞ;3£ºÖÆ¶¯;
-FLOAT32* plan_time = NULL;						 // ³õÊ¼»¯ÔÚÀëÉ¢µãĞèÒª´ïµ½µÄÔËĞĞÊ±·Ö;
-UINT32	interval_length;						// ÏÂÒ»Çø¼ä³¤¶Èm
-UINT32	interval_length_cm;						// ÏÂÒ»Çø¼ä³¤¶Ècm
-UINT32	target_time_offline;					// ÀëÏßÇó½âÄ¿±êÔËĞĞÊ±·Ö
-UINT32	target_time_online;						// ÔÚÏßÓÅ»¯Ä¿±êÔËĞĞÊ±·Ö
-UINT16	dim;									// ½¨Ä£ÀëÉ¢Î¬¶È
-UINT8	limit_num;								// ÏŞËÙÇĞ»»µã¸öÊı
-UINT16  solution_num = 50;						// ½â¿Õ¼ä´óĞ¡
-UINT16  discrete_size = 100;					// ÀëÉ¢²½³¤
-FLOAT32 optimal_time_offline = 0;				// ÀëÏßÓÅ»¯ÔËĞĞÊ±·Ö
-TRAIN_LOACTION_STRU train_start_loc;
-TRAIN_LOACTION_STRU train_start_loc;			// ÁĞ³µÆğÊ¼Î»ÖÃ
-UINT16 remain_section_length;					// Çø¼ä½øĞĞµÈ¼ä¸ôÀëÉ¢ºóµÄÊ£Óà³¤¶È
+TRAIN_PARAMETER				g_train_param;						// åˆ—è½¦å‚æ•°
+UINT16						g_aw_id;							// è½½è·
+LINE_PARAMETER              g_line_param;                       // çº¿è·¯å‚æ•° ä¸‹è¡Œ
+LINE_PARAMETER              g_line_param_up;                    // çº¿è·¯å‚æ•° ä¸Šè¡Œ
+STATIC_DATA_CSV             g_static_data_csv;                  // CSVé™æ€æ•°æ®
+SPEED_PLAN_INFO             g_speed_plan_info;                  // é€Ÿåº¦è§„åˆ’ä¿¡æ¯
+
+
+/*é€Ÿåº¦è§„åˆ’ç›¸å…³å˜é‡*/
+FLOAT32* gradient = NULL;						 // åˆå§‹åŒ–åŒºé—´å¡åº¦å­˜å‚¨æŒ‡é’ˆ;
+UINT32* curve_radius = NULL;					 // åˆå§‹åŒ–åŒºé—´æ›²çº¿åŠå¾„å­˜å‚¨æŒ‡é’ˆ;
+UINT32* speed_limit_location = NULL;			 // åˆå§‹åŒ–é™é€Ÿè½¬æ¢ç‚¹ä½ç½®å­˜å‚¨æŒ‡é’ˆ;
+UINT16* speed_limit = NULL;						 // åˆå§‹åŒ–é™é€Ÿè½¬æ¢ç‚¹é™é€Ÿå­˜å‚¨æŒ‡é’ˆ;
+UINT16* speed_curve_offline = NULL;				 // åˆå§‹åŒ–ç¦»çº¿ä¼˜åŒ–é€Ÿåº¦å­˜å‚¨æŒ‡é’ˆ;
+UINT16* tartget_speed_curve = NULL;				 // åˆå§‹åŒ–ä¼˜åŒ–é€Ÿåº¦å­˜å‚¨æŒ‡é’ˆ;
+UINT16* speed_limit_max = NULL;					 // åˆå§‹åŒ–æœ€å¿«é€Ÿåº¦å­˜å‚¨æŒ‡é’ˆ;
+UINT16* speed_limit_min = NULL;					 // åˆå§‹åŒ–æœ€å°é€Ÿåº¦å­˜å‚¨æŒ‡é’ˆ;
+UINT16* speed_limit_mmax = NULL;				 // åˆå§‹åŒ–é¡¶æ£šé™é€Ÿå­˜å‚¨æŒ‡é’ˆ;
+UINT16* level_output_flag = NULL;				 // åˆå§‹åŒ–çº§ä½è¾“å‡ºæ ‡è¯†1ï¼šç‰µå¼•ï¼›2ï¼šæƒ°è¡Œ;3ï¼šåˆ¶åŠ¨;
+FLOAT32* plan_time = NULL;						 // åˆå§‹åŒ–åœ¨ç¦»æ•£ç‚¹éœ€è¦è¾¾åˆ°çš„è¿è¡Œæ—¶åˆ†;
+UINT32	interval_length;						// ä¸‹ä¸€åŒºé—´é•¿åº¦m
+UINT32	interval_length_cm;						// ä¸‹ä¸€åŒºé—´é•¿åº¦cm
+UINT32	target_time_offline;					// ç¦»çº¿æ±‚è§£ç›®æ ‡è¿è¡Œæ—¶åˆ†
+UINT32	target_time_online;						// åœ¨çº¿ä¼˜åŒ–ç›®æ ‡è¿è¡Œæ—¶åˆ†
+UINT16	dim;									// å»ºæ¨¡ç¦»æ•£ç»´åº¦
+UINT8	limit_num;								// é™é€Ÿåˆ‡æ¢ç‚¹ä¸ªæ•°
+UINT16  solution_num = 50;						// è§£ç©ºé—´å¤§å°
+UINT16  discrete_size = 1000;					// ç¦»æ•£æ­¥é•¿
+FLOAT32 optimal_time_offline = 0;				// ç¦»çº¿ä¼˜åŒ–è¿è¡Œæ—¶åˆ†
+UINT16 remain_section_length;					// åŒºé—´è¿›è¡Œç­‰é—´éš”ç¦»æ•£åçš„å‰©ä½™é•¿åº¦
 
 /*************************************************************************
-* ¹¦ÄÜÃèÊö: ÀëÏßÇó½âËã·¨Èë¿Ú
-* ÊäÈë²ÎÊı: ÎŞ
-* Êä³ö²ÎÊı: ÎŞ
-* ·µ»ØÖµ:   ÎŞ
+* åŠŸèƒ½æè¿°: é€Ÿåº¦è§„åˆ’ä¸»ç¨‹åº
+* è¾“å…¥å‚æ•°: æ— 
+* è¾“å‡ºå‚æ•°: æ— 
+* è¿”å›å€¼:   æ— 
 *************************************************************************/
-void SpeedPlanOffline()
+void SpeedPlanMain()
 {
-	UINT32 start = clock();
-	//ÇúÏßÓÅ»¯²âÊÔÊı¾İ
-	target_time_offline = 120;
-	//»ù´¡Êı¾İÔ¤´¦Àí
-	gradient = (FLOAT32*)malloc(MAX_INTERVAL_SAMPLING * sizeof(FLOAT32));				// ³õÊ¼»¯Çø¼äÆÂ¶È´æ´¢Ö¸Õë;
-	curve_radius = (UINT32*)malloc(MAX_INTERVAL_SAMPLING * sizeof(UINT32));				// ³õÊ¼»¯Çø¼äÇúÏß°ë¾¶´æ´¢Ö¸Õë;
-	speed_limit_location = (UINT32*)malloc(MAX_LIMIT_POINT * sizeof(UINT32));			// ³õÊ¼»¯ÏŞËÙ×ª»»µãÎ»ÖÃ´æ´¢Ö¸Õë;
-	speed_limit = (UINT16*)malloc(MAX_LIMIT_POINT * sizeof(UINT16));					// ³õÊ¼»¯ÏŞËÙ×ª»»µãÏŞËÙ´æ´¢Ö¸Õë;
-	speed_curve_offline = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));			// ³õÊ¼»¯ÀëÏßÓÅ»¯ËÙ¶È´æ´¢Ö¸Õë;
-	tartget_speed_curve = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));			// ³õÊ¼»¯ÓÅ»¯ËÙ¶È´æ´¢Ö¸Õë;
-	speed_limit_max = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));				// ³õÊ¼»¯×î¿ìËÙ¶È´æ´¢Ö¸Õë;
-	speed_limit_min = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));				// ³õÊ¼»¯×îĞ¡ËÙ¶È´æ´¢Ö¸Õë;
-	speed_limit_mmax = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));				// ³õÊ¼»¯¶¥ÅïÏŞËÙ´æ´¢Ö¸Õë;
-	level_output_flag = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));              // ³õÊ¼»¯¼¶Î»Êä³ö±êÊ¶1£ºÇ£Òı£»2£º¶èĞĞ;3£ºÖÆ¶¯£»;
-	plan_time = (FLOAT32*)malloc(MAX_SPEED_CURVE * sizeof(FLOAT32));					// ³õÊ¼»¯ÔÚÀëÉ¢µãĞèÒª´ïµ½µÄÔËĞĞÊ±·Ö;
-	
-	//Êı¾İ×¼±¸		
-	GetBaseDataReady();
-																				
-	//ÀëÏßÇó½â
-	//³ö¿Ú²ÎÊı³õÊ¼»¯
-	memset(level_output_flag, 0, MAX_SPEED_CURVE * sizeof(UINT16));
-	dim = GetOptimalSpeedOffline(speed_curve_offline, discrete_size, speed_limit_max, speed_limit_min, speed_limit_mmax,
-		interval_length_cm, speed_limit_location, speed_limit, limit_num, target_time_offline, solution_num);
-	UINT32 finish = clock();
-	printf("Çó½â½áÊø£¬¼ÆËãÓÃÊ±£º % d ms\n", (finish - start) / 1000);
-	free(gradient);
-	free(curve_radius);
-	free(speed_limit_location);
-	free(speed_limit);
-	free(speed_curve_offline);
-	free(tartget_speed_curve);
-	free(speed_limit_max);
-	free(speed_limit_min);
-	free(speed_limit_mmax);
-	free(level_output_flag);
-	free(plan_time);
+    /*å¦‚æœä¿¡å·ç³»ç»Ÿå‘é€å…è®¸è®¡åˆ’æ›´æ–°ä¸”æ— æ­£åœ¨è¿›è¡Œçš„æ›²çº¿ä¼˜ä»»åŠ¡*/
+    if(g_period_msg_from_signal.train_plan_flag==1&&g_speed_plan_info.optimize_stage==2)
+    {
+        //å‚æ•°æ ¡éªŒ
+        UINT8 data_error_flag=0;
+        g_speed_plan_info.current_direction=g_period_msg_from_signal.train_direction;//åˆ—è½¦è¿è¡Œæ–¹å‘
+        g_speed_plan_info.interval_begin_dis=g_period_msg_from_signal.train_distance;//åŒºé—´èµ·å§‹ä½ç½®ä¸ºåˆ—è½¦å¤´éƒ¨ä½ç½®
+        memcpy(g_speed_plan_info.next_station_name,g_period_msg_from_signal.next_staion_name,20);
+
+        for(int i=0;i<g_static_data_csv.station_csv.length;i++)
+        {
+            if(strcmp(g_static_data_csv.station_csv.station_name[i],g_speed_plan_info.next_station_name)==0)
+            {
+                g_speed_plan_info.interval_end_dis=g_static_data_csv.station_csv.begin_distance[i];//åŒºé—´èµ·ç»“æŸä½ç½®ä¸ºä¸‹ä¸€ç«™å…¬é‡Œæ ‡ä½ç½®
+                if(g_speed_plan_info.current_direction==0)
+                {
+                    if(g_speed_plan_info.interval_end_dis<=g_speed_plan_info.interval_begin_dis)
+                    {
+                        data_error_flag=1;
+                        printf("SPEED_PLAN:error!");
+                        break;
+                    }
+                    if(i!=0)
+                    {
+                        g_speed_plan_info.target_time=(UINT32)g_static_data_csv.station_csv.schedule_time[i-1];
+                    }
+                    else
+                    {
+                        g_speed_plan_info.target_time=0;
+                        data_error_flag=1;
+                        printf("SPEED_PLAN:error!");
+                        break;
+                    }
+                }
+                else
+                {
+                    g_speed_plan_info.target_time=(UINT32)g_static_data_csv.station_csv.schedule_time[i];
+                    if(g_speed_plan_info.interval_end_dis>=g_speed_plan_info.interval_begin_dis)
+                    {
+                        data_error_flag=1;
+                        printf("SPEED_PLAN:error!");
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        //test
+        g_speed_plan_info.interval_begin_dis=0;
+        g_speed_plan_info.interval_end_dis=4280;
+        g_speed_plan_info.target_time=250;
+        data_error_flag=0;
+        if (data_error_flag==0)
+        {
+            g_speed_plan_info.optimize_stage=1;
+            pthread_t tid_speed_plan;
+            /*åˆ›å»ºæ›²çº¿ä¼˜åŒ–çº¿ç¨‹*/
+            if(pthread_create(&tid_speed_plan,NULL,SpeedPlanOffline,NULL))
+            {
+                perror("Fail to create server thread");
+            }
+        }
 
 
+
+    }
+}
+
+/*************************************************************************
+* åŠŸèƒ½æè¿°: ç¦»çº¿æ±‚è§£ç®—æ³•å…¥å£
+* è¾“å…¥å‚æ•°: æ— 
+* è¾“å‡ºå‚æ•°: æ— 
+* è¿”å›å€¼:   æ— 
+*************************************************************************/
+void *SpeedPlanOffline()
+{
+    UINT32 start = clock();
+    //åŸºç¡€æ•°æ®é¢„å¤„ç†
+    gradient = (FLOAT32*)malloc(MAX_INTERVAL_SAMPLING * sizeof(FLOAT32));				// åˆå§‹åŒ–åŒºé—´å¡åº¦å­˜å‚¨æŒ‡é’ˆ;
+    curve_radius = (UINT32*)malloc(MAX_INTERVAL_SAMPLING * sizeof(UINT32));				// åˆå§‹åŒ–åŒºé—´æ›²çº¿åŠå¾„å­˜å‚¨æŒ‡é’ˆ;
+    speed_limit_location = (UINT32*)malloc(MAX_LIMIT_POINT * sizeof(UINT32));			// åˆå§‹åŒ–é™é€Ÿè½¬æ¢ç‚¹ä½ç½®å­˜å‚¨æŒ‡é’ˆ;
+    speed_limit = (UINT16*)malloc(MAX_LIMIT_POINT * sizeof(UINT16));					// åˆå§‹åŒ–é™é€Ÿè½¬æ¢ç‚¹é™é€Ÿå­˜å‚¨æŒ‡é’ˆ;
+    speed_curve_offline = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));			// åˆå§‹åŒ–ç¦»çº¿ä¼˜åŒ–é€Ÿåº¦å­˜å‚¨æŒ‡é’ˆ;
+    tartget_speed_curve = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));			// åˆå§‹åŒ–ä¼˜åŒ–é€Ÿåº¦å­˜å‚¨æŒ‡é’ˆ;
+    speed_limit_max = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));				// åˆå§‹åŒ–æœ€å¿«é€Ÿåº¦å­˜å‚¨æŒ‡é’ˆ;
+    speed_limit_min = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));				// åˆå§‹åŒ–æœ€å°é€Ÿåº¦å­˜å‚¨æŒ‡é’ˆ;
+    speed_limit_mmax = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));				// åˆå§‹åŒ–é¡¶æ£šé™é€Ÿå­˜å‚¨æŒ‡é’ˆ;
+    level_output_flag = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));              // åˆå§‹åŒ–çº§ä½è¾“å‡ºæ ‡è¯†1ï¼šç‰µå¼•ï¼›2ï¼šæƒ°è¡Œ;3ï¼šåˆ¶åŠ¨ï¼›;
+    plan_time = (FLOAT32*)malloc(MAX_SPEED_CURVE * sizeof(FLOAT32));					// åˆå§‹åŒ–åœ¨ç¦»æ•£ç‚¹éœ€è¦è¾¾åˆ°çš„è¿è¡Œæ—¶åˆ†;
+
+    //æ•°æ®å‡†å¤‡
+    GetBaseDataReady();
+
+    //ç¦»çº¿æ±‚è§£
+    //å‡ºå£å‚æ•°åˆå§‹åŒ–
+    memset(level_output_flag, 0, MAX_SPEED_CURVE * sizeof(UINT16));
+    dim = GetOptimalSpeedOffline(speed_curve_offline, discrete_size, speed_limit_max, speed_limit_min, speed_limit_mmax,
+                                 interval_length_cm, speed_limit_location, speed_limit, limit_num, target_time_offline, solution_num);
+    DivideStageByOptimizeSpeed();
+    UINT32 finish = clock();
+    UINT32 cal_time=(finish - start) / 1000;
+    printf("end:time % d ms\n", cal_time);
+    LogWrite(INFO,"%s:%d%s","end:use_time",cal_time,"ms");
+
+    free(gradient);
+    free(curve_radius);
+    free(speed_limit_location);
+    free(speed_limit);
+    free(speed_curve_offline);
+    free(tartget_speed_curve);
+    free(speed_limit_max);
+    free(speed_limit_min);
+    free(speed_limit_mmax);
+    free(level_output_flag);
+    free(plan_time);
+    pthread_exit(0);//æ­¤çº¿ç¨‹é€€å‡º
 }
 
 
 /*************************************************************************
-* ¹¦ÄÜÃèÊö: Êı¾İÔ¤´¦Àí£¬ÕûÀíÇø¼ä³¤¶È¡¢ÏŞËÙ¡¢ÆÂ¶È¡¢ÇúÏß°ë¾¶µÈĞÅÏ¢
-* ÊäÈë²ÎÊı:
-*		const EMAP_DATA&			emap				µç×ÓµØÍ¼Êı¾İ
-*		TRAIN_LOACTION_STRU			train_head_loc		ÁĞ³µÍ·Î»ÖÃ
-*		TRAIN_LOACTION_STRU			train_tail_loc		ÁĞ³µÎ²Î»ÖÃ
-*		UINT8						direction			ÔËĞĞ·½Ïò
-*		UINT16						park_area_id		Ä¿±êÍ£³µÇøÓòid
-*		UINT16						park_point_index	Ä¿±êÍ£³µµãË÷Òı
-* Êä³ö²ÎÊı:
-* ·µ»ØÖµ:   0:²éÑ¯Ê§°Ü 1:²éÑ¯³É¹¦
+* åŠŸèƒ½æè¿°: æ•°æ®é¢„å¤„ç†ï¼Œæ•´ç†åŒºé—´é•¿åº¦ã€é™é€Ÿã€å¡åº¦ã€æ›²çº¿åŠå¾„ç­‰ä¿¡æ¯
+* è¾“å…¥å‚æ•°: æ— 
+* è¾“å‡ºå‚æ•°: æ— 
+* è¿”å›å€¼:   0:æŸ¥è¯¢å¤±è´¥ 1:æŸ¥è¯¢æˆåŠŸ
 *************************************************************************/
 UINT8 GetBaseDataReady()
 {
-	UINT8  result = 1;						/*º¯Êı·µ»ØÖµ*/
-	UINT16 speed_limit_last = 0;			/*ÉÏÒ»ÏŞËÙÖµÁÙÊ±±äÁ¿*/
-	UINT32 k = 0;							/*Ñ­»·±äÁ¿*/
-	INT32  gradient_equivalent;				/*µÈĞ§ÆÂ¶ÈÖµ*/
-	UINT16 curve_radius_id;					/*ÇúÏß°ë¾¶idÁÙÊ±±äÁ¿*/
-	UINT32 curve_radius_value;				/*ÇúÏß°ë¾¶Öµ*/
+    UINT8  result = 1;						/*å‡½æ•°è¿”å›å€¼*/
+    UINT16 speed_limit_last = 0;			/*ä¸Šä¸€é™é€Ÿå€¼ä¸´æ—¶å˜é‡*/
+    UINT32 k = 0;							/*å¾ªç¯å˜é‡*/
+    LINE_PARAMETER* line_param_temp;
+    //
+    if(g_direction==0)
+    {
+        line_param_temp = &g_line_param;
+    }
+    else
+    {
+        line_param_temp = &g_line_param_up;
+    }
 
-	if (0 != g_line_param.interval_length)
-	{
-		/*¸ù¾İÖĞ¼älinkĞòÁĞ¡¢ÁĞ³µÎ»ÖÃ¡¢ÏÂÒ»Í£³µµã¼ÆËãÇø¼ä³¤¶È*/
-		interval_length = g_line_param.interval_length;
-		interval_length_cm = interval_length * 100;
 
-		/*±éÀúËùÓĞÎ»ÖÃÏŞËÙ£¬ÕÒµ½ÏŞËÙÇĞ»»µã¼°¶ÔÓ¦ÏŞËÙ*/
-		speed_limit_last = g_line_param.limit[0];
-		for (UINT32 i = 1; i < interval_length; i++)
-		{
-			if (g_line_param.limit[i] != speed_limit_last)//ÏŞËÙÇĞ»»
-			{
-				/*¼ÇÂ¼ÇĞ»»µãÎ»ÖÃºÍÏŞËÙÖµ*/
-				speed_limit_location[k] = (i - 1) * 100;
-				speed_limit[k] = speed_limit_last;
-				/*¸üĞÂÉÏÒ»ÏŞËÙ*/
-				speed_limit_last = g_line_param.limit[i];
-				k += 1;
-			}
-			else
-			{
-				continue;
-			}
-		}
-		speed_limit_location[k] = (interval_length) * 100;
-		speed_limit[k] = g_line_param.limit[interval_length - 1];
-		limit_num = k+1;
-		for (INT32 i = 0; i < limit_num; i++)
-		{
-			printf("ÏŞËÙ×ª»»µã¼ÆËã£ºÎ»ÖÃ£º%d,ÏŞËÙ£º%d\n", speed_limit_location[i], speed_limit[i]);
-		}
-		for (INT32 i = 0; i < interval_length; i++)
-		{
-			gradient[i] = g_line_param.gradient[i]; //ÆÂ¶È
-			curve_radius[i] = g_line_param.curve_radius[i];//ÇúÏß°ë¾¶
-			printf("Î»ÖÃ£º%d,ÆÂ¶È£º%f,ÇúÏß°ë¾¶£º%d\n", i*100, gradient[i], curve_radius[i]);
-		}
-	}
 
-	/*ÊÍ·ÅËùÉêÇëµÄÄÚ´æ, ·ÀÖ¹ÄÚ´æĞ¹Â¶*/
-	return result;
+    /*æ›²çº¿ä¼˜åŒ–æ‰€éœ€æ•°æ®å‡†å¤‡*/
+    if(g_speed_plan_info.interval_begin_dis<line_param_temp->line_length&&g_speed_plan_info.interval_end_dis<=line_param_temp->line_length)
+    {
+        target_time_offline = g_speed_plan_info.target_time;
+        /*è®¡ç®—åŒºé—´é•¿åº¦*/
+        interval_length=g_speed_plan_info.interval_end_dis-g_speed_plan_info.interval_begin_dis;
+        interval_length_cm = interval_length * 100;
+        /*éå†æ‰€æœ‰ä½ç½®é™é€Ÿï¼Œæ‰¾åˆ°é™é€Ÿåˆ‡æ¢ç‚¹åŠå¯¹åº”é™é€Ÿ*/
+        speed_limit_last = line_param_temp->limit[g_speed_plan_info.interval_begin_dis/line_param_temp->discrete_size];
+        for (int i=0;i<line_param_temp->discrete_num;i++)
+        {
+            if(g_speed_plan_info.interval_begin_dis<=i*line_param_temp->discrete_size
+               &&g_speed_plan_info.interval_end_dis>=i*line_param_temp->discrete_size)
+            {
+                if (line_param_temp->limit[i] != speed_limit_last)//é™é€Ÿåˆ‡æ¢
+                {
+                    /*è®°å½•åˆ‡æ¢ç‚¹ä½ç½®å’Œé™é€Ÿå€¼*/
+                    speed_limit_location[k] = (i - 1) * line_param_temp->discrete_size*100;
+                    speed_limit[k] = speed_limit_last;
+                    /*æ›´æ–°ä¸Šä¸€é™é€Ÿ*/
+                    speed_limit_last = line_param_temp->limit[i];
+                    k += 1;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+        }
+        speed_limit_location[k] = g_speed_plan_info.interval_end_dis*100;
+        speed_limit[k] = line_param_temp->limit[g_speed_plan_info.interval_end_dis/line_param_temp->discrete_size - 1];
+        limit_num = k+1;
+        for (int i = 0; i < limit_num; i++)
+        {
+            printf("speed_change:loc:%d,limit:%d\n", speed_limit_location[i], speed_limit[i]);
+        }
+        for (int i=0;i<line_param_temp->discrete_num;i++)
+        {
+            if(g_speed_plan_info.interval_begin_dis<=i*line_param_temp->discrete_size
+               &&g_speed_plan_info.interval_end_dis>=i*line_param_temp->discrete_size)
+            {
+                gradient[i] = line_param_temp->gradient[i]; //å¡åº¦
+                curve_radius[i] = line_param_temp->curve_radius[i];//æ›²çº¿åŠå¾„
+                printf("loc:%d,gradient:%f,curve:%d\n", i*line_param_temp->discrete_size, gradient[i], curve_radius[i]);
+            }
+        }
+
+    }
+
+    /*é‡Šæ”¾æ‰€ç”³è¯·çš„å†…å­˜, é˜²æ­¢å†…å­˜æ³„éœ²*/
+    return result;
 }
 
 /*************************************************************************
-* ¹¦ÄÜÃèÊö: ÀëÏß¼ÆËãÏÂÒ»Çø¼äÓÅ»¯ËÙ¶È
-* ÊäÈë²ÎÊı:
-*		UINT16						discrete_size			¾àÀëÀëÉ¢´óĞ¡
-*		UINT32						section_length			Çø¼ä³¤¶Ècm
-*		UINT32						speed_limit_location[]	ÏŞËÙÇĞ»»µãÎ»ÖÃ
-*		UINT16						speed_limit[]			¶ÔÓ¦ÇĞ»»µãÏŞËÙÖµ
-*		UINT16						speed_limit_length		ÏŞËÙÇĞ»»µã¸öÊı
-*		UINT16						target_time				Çø¼äÄ¿±êÔËĞĞÊ±·Ö
-*		UINT16						solution_num			½â¿Õ¼ä´óĞ¡
-* Êä³ö²ÎÊı:
-*		UINT16*						speed_curve				ËÙ¶ÈÇúÏß
-*		UINT16*						speed_limit_max			×î¿ìËÙ¶ÈÇúÏßÏŞÖÆ
-*		UINT16*						speed_limit_min			×îÂıËÙ¶ÈÇúÏßÏŞÖÆ
-*		UINT16*						speed_limit_mmax		¶¥ÅïËÙ¶ÈÇúÏßÏŞÖÆ
-* ·µ»ØÖµ:
-*		UINT16						dim						½â¿Õ¼äÎ¬¶È
+* åŠŸèƒ½æè¿°: ç¦»çº¿è®¡ç®—ä¸‹ä¸€åŒºé—´ä¼˜åŒ–é€Ÿåº¦
+* è¾“å…¥å‚æ•°:
+*		UINT16						discrete_size			è·ç¦»ç¦»æ•£å¤§å°
+*		UINT32						section_length			åŒºé—´é•¿åº¦cm
+*		UINT32						speed_limit_location[]	é™é€Ÿåˆ‡æ¢ç‚¹ä½ç½®
+*		UINT16						speed_limit[]			å¯¹åº”åˆ‡æ¢ç‚¹é™é€Ÿå€¼
+*		UINT16						speed_limit_length		é™é€Ÿåˆ‡æ¢ç‚¹ä¸ªæ•°
+*		UINT16						target_time				åŒºé—´ç›®æ ‡è¿è¡Œæ—¶åˆ†
+*		UINT16						solution_num			è§£ç©ºé—´å¤§å°
+* è¾“å‡ºå‚æ•°:
+*		UINT16*						speed_curve				é€Ÿåº¦æ›²çº¿
+*		UINT16*						speed_limit_max			æœ€å¿«é€Ÿåº¦æ›²çº¿é™åˆ¶
+*		UINT16*						speed_limit_min			æœ€æ…¢é€Ÿåº¦æ›²çº¿é™åˆ¶
+*		UINT16*						speed_limit_mmax		é¡¶æ£šé€Ÿåº¦æ›²çº¿é™åˆ¶
+* è¿”å›å€¼:
+*		UINT16						dim						è§£ç©ºé—´ç»´åº¦
 *************************************************************************/
 UINT16 GetOptimalSpeedOffline(UINT16* speed_curve, UINT16 discrete_size, UINT16* speed_limit_max, UINT16* speed_limit_min, UINT16* speed_limit_mmax, UINT32 section_length, UINT32 speed_limit_location[], UINT16 speed_limit[], UINT16 speed_limit_length, UINT16 target_time, UINT16 solution_num)
 {
-	//ÊıÑ§½¨Ä£
-	UINT16 dim = (UINT16)ceil(section_length * 1.0 / discrete_size)-1;//°´µÈ¼ä¸ô»®·ÖÎ¬¶È
-	remain_section_length = section_length - dim * discrete_size;
-	Modeling(speed_limit_max, speed_limit_min, speed_limit_mmax, discrete_size, dim, solution_num, speed_limit_location, speed_limit, speed_limit_length, target_time);
-	//¸ù¾İµ±Ç°Î»ÖÃÆô·¢
-	UINT32* lower_bound = (UINT32*)malloc(5 * sizeof(UINT32));//³õÊ¼»¯Çó½âÏÂ±ß½ç´æ´¢Ö¸Õë;
-	if (NULL == lower_bound)
-		return dim;
-	UINT32* upper_bound = (UINT32*)malloc(5 * sizeof(UINT32));//³õÊ¼»¯Çó½âÉÏ±ß½ç´æ´¢Ö¸Õë;
-	if (NULL == upper_bound)
-		return dim;
-	UINT8* switch_flag = (UINT8*)malloc(5 * sizeof(UINT8));//³õÊ¼»¯¹¤¿öÇĞ»»±êÊ¶´æ´¢Ö¸Õë;
-	if (NULL == switch_flag)
-		return dim;
-	UINT8 bound_size = GetBounderOffline(lower_bound, upper_bound, switch_flag);
-	for (INT32 i = 0; i < bound_size; i++)
-	{
-		printf("ÏÂ½ç:%d;ÉÏ½ç:%d\n", lower_bound[i], upper_bound[i]);
-	}
-	//»ÒÀÇËã·¨Çó½â
-	GWO_Offline(speed_curve, speed_limit_max, speed_limit_min, dim, target_time, discrete_size, lower_bound, upper_bound, switch_flag, bound_size);
-	free(lower_bound);
-	free(upper_bound);
-	free(switch_flag);
-	return dim;
+    //æ•°å­¦å»ºæ¨¡
+    UINT16 dim = (UINT16)ceil(section_length * 1.0 / discrete_size)-1;//æŒ‰ç­‰é—´éš”åˆ’åˆ†ç»´åº¦
+    remain_section_length = section_length - dim * discrete_size;
+    Modeling(speed_limit_max, speed_limit_min, speed_limit_mmax, discrete_size, dim, solution_num, speed_limit_location, speed_limit, speed_limit_length, target_time);
+    //æ ¹æ®å½“å‰ä½ç½®å¯å‘
+    UINT32 lower_bound[5];//åˆå§‹åŒ–æ±‚è§£ä¸‹è¾¹ç•Œå­˜å‚¨æŒ‡é’ˆ;
+    UINT32 upper_bound[5];//åˆå§‹åŒ–æ±‚è§£ä¸Šè¾¹ç•Œå­˜å‚¨æŒ‡é’ˆ;
+    UINT8 switch_flag[5];//åˆå§‹åŒ–å·¥å†µåˆ‡æ¢æ ‡è¯†å­˜å‚¨æŒ‡é’ˆ;
+    UINT8 bound_size = GetBounderOffline(lower_bound, upper_bound, switch_flag);
+    for (INT32 i = 0; i < bound_size; i++)
+    {
+        printf("lower_bound:%d;upper_bound:%d\n", lower_bound[i], upper_bound[i]);
+        LogWrite(INFO,"%s:%d,%s:%d","lower_bound",lower_bound[i],"upper_bound",upper_bound[i]);
+    }
+    //ç°ç‹¼ç®—æ³•æ±‚è§£
+    GWO_Offline(speed_curve, speed_limit_max, speed_limit_min, dim, target_time, discrete_size, lower_bound, upper_bound, switch_flag, bound_size);
+    return dim;
 }
 
 
 
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ½¨Ä£
-  * ÊäÈë²ÎÊı:
-  *		UINT16						discrete_size			¾àÀëÀëÉ¢´óĞ¡
-  *		UINT16						dim						½â¿Õ¼äÎ¬¶È
-  *		UINT16						solution_num			½â¿Õ¼ä´óĞ¡
-  *		UINT32						speed_limit_loc[]		ÏßÂ·ÏŞËÙ-¶ÔÓ¦Î»ÖÃ
-  *		UINT16						speed_limit[]			ÏßÂ·ÏŞËÙ-¶ÔÓ¦ÏŞËÙÖµ
-  *		UINT16						speed_limit_length		ÏßÂ·ÏŞËÙ´æ´¢Êı×é´óĞ¡
-  *		UINT16						target_time				Ä¿±êÔËĞĞÊ±·Ö
-  * Êä³ö²ÎÊı:
-  *		UINT16*						speed_limit_max			×î¿ìËÙ¶ÈÇúÏß
-  *		UINT16*						speed_limit_min			×îÂıËÙ¶ÈÇúÏß
-  *		UINT16*						speed_limit_mmax		¶¥ÅïÏŞËÙÇúÏß
-  * ·µ»ØÖµ:
+  * åŠŸèƒ½æè¿°: å»ºæ¨¡
+  * è¾“å…¥å‚æ•°:
+  *		UINT16						discrete_size			è·ç¦»ç¦»æ•£å¤§å°
+  *		UINT16						dim						è§£ç©ºé—´ç»´åº¦
+  *		UINT16						solution_num			è§£ç©ºé—´å¤§å°
+  *		UINT32						speed_limit_loc[]		çº¿è·¯é™é€Ÿ-å¯¹åº”ä½ç½®
+  *		UINT16						speed_limit[]			çº¿è·¯é™é€Ÿ-å¯¹åº”é™é€Ÿå€¼
+  *		UINT16						speed_limit_length		çº¿è·¯é™é€Ÿå­˜å‚¨æ•°ç»„å¤§å°
+  *		UINT16						target_time				ç›®æ ‡è¿è¡Œæ—¶åˆ†
+  * è¾“å‡ºå‚æ•°:
+  *		UINT16*						speed_limit_max			æœ€å¿«é€Ÿåº¦æ›²çº¿
+  *		UINT16*						speed_limit_min			æœ€æ…¢é€Ÿåº¦æ›²çº¿
+  *		UINT16*						speed_limit_mmax		é¡¶æ£šé™é€Ÿæ›²çº¿
+  * è¿”å›å€¼:
   *************************************************************************/
 void Modeling(UINT16* speed_limit_max, UINT16* speed_limit_min, UINT16* speed_limit_mmax, UINT16 discrete_size, UINT16 dim,
-	UINT16 solution_num, UINT32 speed_limit_loc[], UINT16 speed_limit[], UINT16 speed_limit_length, UINT16 target_time)
+              UINT16 solution_num, UINT32 speed_limit_loc[], UINT16 speed_limit[], UINT16 speed_limit_length, UINT16 target_time)
 {
-	UINT16 j = 0;						//ÏŞËÙ±ä»¯µãË÷Òı³õÊ¼»¯
-	UINT16 p = 0;						//ÏŞËÙÏÂ½µµãË÷Òı³õÊ¼»¯
-	UINT32 location_index;
-	UINT16* speed_limit_temp = NULL;	//ÏŞËÙÀëÉ¢´æ´¢Ö¸Õë³õÊ¼»¯
-	UINT16* limit_fall_begin = NULL;	//ÏŞËÙÏÂ½µ¿ªÊ¼ËÙ¶È
-	UINT16* limit_fall_end = NULL;		//ÏŞËÙÏÂ½µ½áÊøËÙ¶È
-	UINT16* limit_fall_index = NULL;	//ÏŞËÙÏÂ½µ¶ÔÓ¦ÀëÉ¢Ë÷Òı
-	speed_limit_temp = (UINT16*)malloc(MAX_INTERVAL_SAMPLING * sizeof(UINT16));
-	limit_fall_begin = (UINT16*)malloc(MAX_LIMIT_POINT * sizeof(UINT16));
-	limit_fall_end = (UINT16*)malloc(MAX_LIMIT_POINT * sizeof(UINT16));
-	limit_fall_index = (UINT16*)malloc(MAX_LIMIT_POINT * sizeof(UINT16));
-	/*ÉêÇëÄÚ´æÎŞĞ§·À»¤*/
-	if (NULL == speed_limit_temp || NULL == limit_fall_begin || NULL == limit_fall_end || NULL == limit_fall_index)
-		return;
-	/*ÌáÈ¡Ç°·½ÏŞËÙÏÂ½µ*/
-	for (UINT16 i = 0; i <= dim; i++)
-	{
-		speed_limit_temp[i] = speed_limit[j];
-		speed_limit_mmax[i] = speed_limit[j];
-		location_index = (i + 1) * discrete_size;
-		if (location_index < speed_limit_loc[j])
-		{
-			continue;
-		}
-		else
-		{
-			j++;
-			if (j < speed_limit_length)
-			{
-				if (speed_limit[j] < speed_limit[j - 1])
-				{
-					limit_fall_begin[p] = GetEbiEnd(speed_limit[j], speed_limit_temp, i);
-					limit_fall_end[p] = speed_limit[j];
-					limit_fall_index[p] = i;
-					p++;
-				}
-			}
-			else
-			{
-				limit_fall_begin[p] = GetEbiEnd(0, speed_limit_temp, i);
-				limit_fall_end[p] = 0;
-				limit_fall_index[p] = i - 1;
-				p++;
-			}
-		}
-	}
-	speed_limit_temp[dim] = 0;
-	speed_limit_mmax[dim] = 0;
-	/*¸ù¾İÏŞËÙÏÂ½µ¼ÆËãÄ¿±ê¾àÀë·À»¤ËÙ¶È*/
-	for (UINT16 i = 0; i < p; i++)
-	{
-		GetEBI(limit_fall_end[i], limit_fall_begin[i], limit_fall_index[i], speed_limit_temp, discrete_size);
-	}
-	for (UINT16 i = 0; i <= dim; i++)
-	{
-		speed_limit_max[i] = speed_limit_temp[i];
-		speed_limit_min[i] = 0;
-		//printf("×î´ó·À»¤ËÙ¶È%d\n", speed_limit_max[i]);
-	}
-	/*ÊÍ·ÅËùÉêÇëµÄÄÚ´æ, ·ÀÖ¹ÄÚ´æĞ¹Â¶*/
-	free(speed_limit_temp);
-	free(limit_fall_begin);
-	free(limit_fall_end);
-	free(limit_fall_index);
+    UINT16 j = 0;						//é™é€Ÿå˜åŒ–ç‚¹ç´¢å¼•åˆå§‹åŒ–
+    UINT16 p = 0;						//é™é€Ÿä¸‹é™ç‚¹ç´¢å¼•åˆå§‹åŒ–
+    UINT32 location_index;
+    UINT16* speed_limit_temp = NULL;	//é™é€Ÿç¦»æ•£å­˜å‚¨æŒ‡é’ˆåˆå§‹åŒ–
+    UINT16* limit_fall_begin = NULL;	//é™é€Ÿä¸‹é™å¼€å§‹é€Ÿåº¦
+    UINT16* limit_fall_end = NULL;		//é™é€Ÿä¸‹é™ç»“æŸé€Ÿåº¦
+    UINT16* limit_fall_index = NULL;	//é™é€Ÿä¸‹é™å¯¹åº”ç¦»æ•£ç´¢å¼•
+    speed_limit_temp = (UINT16*)malloc(MAX_INTERVAL_SAMPLING * sizeof(UINT16));
+    limit_fall_begin = (UINT16*)malloc(MAX_LIMIT_POINT * sizeof(UINT16));
+    limit_fall_end = (UINT16*)malloc(MAX_LIMIT_POINT * sizeof(UINT16));
+    limit_fall_index = (UINT16*)malloc(MAX_LIMIT_POINT * sizeof(UINT16));
+    /*ç”³è¯·å†…å­˜æ— æ•ˆé˜²æŠ¤*/
+    if (NULL == speed_limit_temp || NULL == limit_fall_begin || NULL == limit_fall_end || NULL == limit_fall_index)
+        return;
+    /*æå–å‰æ–¹é™é€Ÿä¸‹é™*/
+    for (UINT16 i = 0; i <= dim; i++)
+    {
+        speed_limit_temp[i] = speed_limit[j];
+        speed_limit_mmax[i] = speed_limit[j];
+        location_index = (i + 1) * discrete_size;
+        if (location_index < speed_limit_loc[j])
+        {
+            continue;
+        }
+        else
+        {
+            j++;
+            if (j < speed_limit_length)
+            {
+                if (speed_limit[j] < speed_limit[j - 1])
+                {
+                    limit_fall_begin[p] = GetEbiEnd(speed_limit[j], speed_limit_temp, i);
+                    limit_fall_end[p] = speed_limit[j];
+                    limit_fall_index[p] = i;
+                    p++;
+                }
+            }
+            else
+            {
+                limit_fall_begin[p] = GetEbiEnd(0, speed_limit_temp, i);
+                limit_fall_end[p] = 0;
+                limit_fall_index[p] = i - 1;
+                p++;
+            }
+        }
+    }
+    speed_limit_temp[dim] = 0;
+    speed_limit_mmax[dim] = 0;
+    /*æ ¹æ®é™é€Ÿä¸‹é™è®¡ç®—ç›®æ ‡è·ç¦»é˜²æŠ¤é€Ÿåº¦*/
+    for (UINT16 i = 0; i < p; i++)
+    {
+        GetEBI(limit_fall_end[i], limit_fall_begin[i], limit_fall_index[i], speed_limit_temp, discrete_size);
+    }
+    for (UINT16 i = 0; i <= dim; i++)
+    {
+        speed_limit_max[i] = speed_limit_temp[i];
+        speed_limit_min[i] = 0;
+        printf("æœ€å¤§é˜²æŠ¤é€Ÿåº¦%d\n", speed_limit_max[i]);
+    }
+    /*é‡Šæ”¾æ‰€ç”³è¯·çš„å†…å­˜, é˜²æ­¢å†…å­˜æ³„éœ²*/
+    free(speed_limit_temp);
+    free(limit_fall_begin);
+    free(limit_fall_end);
+    free(limit_fall_index);
 }
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ¸ù¾İÇø¼äÏŞËÙ¼ÆËã·À»¤ËÙ¶È
-  * ÊäÈë²ÎÊı:
-  *		UINT16						speed_begin				·´ÍÆ¿ªÊ¼ËÙ¶È
-  *		UINT16						speed_end				½áÊøËÙ¶È
-  *		UINT16						index					ÆğÊ¼Ë÷Òı
-  *		UINT16						discrete_size			¾àÀëÀëÉ¢´óĞ¡
-  * Êä³ö²ÎÊı:
-  *		UINT16*						speed_limit				·À»¤ËÙ¶È
-  * ·µ»ØÖµ:
-  *************************************************************************/
+* åŠŸèƒ½æè¿°: æ ¹æ®åŒºé—´é™é€Ÿè®¡ç®—é˜²æŠ¤é€Ÿåº¦
+* è¾“å…¥å‚æ•°:
+*		UINT16						speed_begin				åæ¨å¼€å§‹é€Ÿåº¦
+*		UINT16						speed_end				ç»“æŸé€Ÿåº¦
+*		UINT16						index					èµ·å§‹ç´¢å¼•
+*		UINT16						discrete_size			è·ç¦»ç¦»æ•£å¤§å°
+* è¾“å‡ºå‚æ•°:
+*		UINT16*						speed_limit				é˜²æŠ¤é€Ÿåº¦
+* è¿”å›å€¼:
+*************************************************************************/
 void GetEBI(UINT16 speed_begin, UINT16 speed_end, UINT16 index, UINT16* speed_limit, UINT16 discrete_size)
 {
-	UINT16 v_index = speed_begin;
-	UINT16 spd;
-	UINT16 acc_break;//ÖÆ¶¯¼õËÙ¶È
-	while (v_index < speed_end)
-	{
-		acc_break = (UINT16)(GetBreakAcc(v_index) * SPEED_PLAN_TB_RATIO);
-		spd = (UINT16)sqrt(v_index * v_index + 2 * acc_break * discrete_size);
-		if (spd < speed_end)
-		{
-			if (index > 0)
-			{
-				if (spd < speed_limit[index])
-				{
-					speed_limit[index] = spd;
-				}
-				v_index = spd;
-				index = index - 1;
-			}
-			else
-			{
-				break;
-			}
-		}
-		else
-		{
-			break;
-		}
-	}
+    UINT16 v_index = speed_begin;
+    UINT16 spd;
+    UINT16 acc_break;//åˆ¶åŠ¨å‡é€Ÿåº¦
+    while (v_index < speed_end)
+    {
+        acc_break = (UINT16)(GetBreakAcc(v_index) * SPEED_PLAN_TB_RATIO);
+        spd = (UINT16)sqrt(v_index * v_index + 2 * acc_break * discrete_size);
+        if (spd < speed_end)
+        {
+            if (index > 0)
+            {
+                if (spd < speed_limit[index])
+                {
+                    speed_limit[index] = spd;
+                }
+                v_index = spd;
+                index = index - 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
 }
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ¼ÆËã·À»¤ËÙ¶ÈÇúÏßÖÕµãµÄ¶¥ÅïËÙ¶È
-  * ÊäÈë²ÎÊı:
-  *		UINT16						ebi_begin				·´ÍÆ¿ªÊ¼ËÙ¶È
-  *		UINT16						index					ÆğÊ¼Ë÷Òı
-  *		UINT16*						speed_limit				ÏŞËÙ
-  * Êä³ö²ÎÊı:
-  * ·µ»ØÖµ:
-  *		UINT16						v_end					¶¥ÅïËÙ¶È
-  *************************************************************************/
+* åŠŸèƒ½æè¿°: è®¡ç®—é˜²æŠ¤é€Ÿåº¦æ›²çº¿ç»ˆç‚¹çš„é¡¶æ£šé€Ÿåº¦
+* è¾“å…¥å‚æ•°:
+*		UINT16						ebi_begin				åæ¨å¼€å§‹é€Ÿåº¦
+*		UINT16						index					èµ·å§‹ç´¢å¼•
+*		UINT16*						speed_limit				é™é€Ÿ
+* è¾“å‡ºå‚æ•°:
+* è¿”å›å€¼:
+*		UINT16						v_end					é¡¶æ£šé€Ÿåº¦
+*************************************************************************/
 UINT16 GetEbiEnd(UINT16 ebi_begin, UINT16* speed_limit, UINT16 index)
 {
-	UINT16 v_end = ebi_begin;
-	for (UINT16 i = 0; i < index - 1; i++)
-	{
-		if (speed_limit[index - i] >= v_end)
-		{
-			v_end = speed_limit[index - i];
-		}
-		else
-		{
-			break;
-		}
-	}
-	return v_end;
+    UINT16 v_end = ebi_begin;
+    for (UINT16 i = 0; i < index - 1; i++)
+    {
+        if (speed_limit[index - i] >= v_end)
+        {
+            v_end = speed_limit[index - i];
+        }
+        else
+        {
+            break;
+        }
+    }
+    return v_end;
 }
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: »ÒÀÇÓÅ»¯Ëã·¨Çó½â×îÓÅ¹¤¿ö×ª»»µã(ÀëÏßÇó½â)
-  * ÊäÈë²ÎÊı:
-  *		UINT16*						speed_limit_max			×î¿ìËÙ¶ÈÇúÏß
-  *		UINT16*						speed_limit_min			×îÂıËÙ¶ÈÇúÏß
-  *		UINT16						dim						½â¿Õ¼äÎ¬¶È
-  *		UINT16						target_time				Ä¿±êÔËĞĞÊ±·Ö
-  *		UINT16						discrete_size			¾àÀëÀëÉ¢´óĞ¡
-  * Êä³ö²ÎÊı:
-  *		UINT16*						optimal_speed			ÓÅ»¯ËÙ¶È
-  * ·µ»ØÖµ:
-  *************************************************************************/
+* åŠŸèƒ½æè¿°: ç°ç‹¼ä¼˜åŒ–ç®—æ³•æ±‚è§£æœ€ä¼˜å·¥å†µè½¬æ¢ç‚¹(ç¦»çº¿æ±‚è§£)
+* è¾“å…¥å‚æ•°:
+*		UINT16*						speed_limit_max			æœ€å¿«é€Ÿåº¦æ›²çº¿
+*		UINT16*						speed_limit_min			æœ€æ…¢é€Ÿåº¦æ›²çº¿
+*		UINT16						dim						è§£ç©ºé—´ç»´åº¦
+*		UINT16						target_time				ç›®æ ‡è¿è¡Œæ—¶åˆ†
+*		UINT16						discrete_size			è·ç¦»ç¦»æ•£å¤§å°
+* è¾“å‡ºå‚æ•°:
+*		UINT16*						optimal_speed			ä¼˜åŒ–é€Ÿåº¦
+* è¿”å›å€¼:
+*************************************************************************/
 void GWO_Offline(UINT16* optimal_speed, UINT16* speed_limit_max, UINT16* speed_limit_min, UINT16 dim, UINT16 target_time,
-	UINT16 discrete_size, UINT32* lower_bound, UINT32* upper_bound, UINT8* switch_flag, UINT8 solve_dim)
+                 UINT16 discrete_size, UINT32* lower_bound, UINT32* upper_bound, UINT8* switch_flag, UINT8 solve_dim)
 {
-	UINT16 wolves_num = 20;//ÀÇÈº´óĞ¡
-	UINT16 iteration = 30;//µü´ú´ÎÊı
-	//³õÊ¼»¯Alpha,Beta,DeltaÀÇÎ»ÖÃ
-	FLOAT32* position_Alpha =(FLOAT32*)malloc(solve_dim * sizeof(FLOAT32));
-	FLOAT32* position_Beta = (FLOAT32*)malloc(solve_dim * sizeof(FLOAT32));
-	FLOAT32* position_Delta = (FLOAT32*)malloc(solve_dim * sizeof(FLOAT32));
-	//³õÊ¼»¯Alpha,Beta,DeltaÀÇÊÊÓ¦¶È
-	UINT16 score_Alpha = 65535;
-	UINT16 score_Beta = 65535;
-	UINT16 score_Delta = 65535;
-	UINT16 fitness;//ÊÊÓ¦¶È
-	FLOAT32 convergence_factor = 1;//ÊÕÁ²Òò×Ó³õÊ¼Öµ
-	//ÏÂÃæÎªGWOÇó½â¹ı³Ì²ÎÊı£¬Ô¤ÏÈ³õÊ¼»¯
-	FLOAT32 a;
-	FLOAT32 A1, A2, A3;
-	FLOAT32 C1, C2, C3;
-	FLOAT32 X1;
-	FLOAT32 X2;
-	FLOAT32 X3;
-	FLOAT32 D_alpha;
-	FLOAT32 D_beta;
-	FLOAT32 D_delta;
-	UINT16* OptimalSpd = NULL;
-	OptimalSpd = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));
-	/*ÉêÇëÄÚ´æÎŞĞ§·À»¤*/
-	if (OptimalSpd == NULL)
-		return;
-	FLOAT32** Positions = NULL;
-	Positions = (FLOAT32**)malloc(wolves_num * sizeof(FLOAT32*));
-	for (int i = 0; i < wolves_num; i++)
-		Positions[i] = (FLOAT32*)malloc(solve_dim * sizeof(FLOAT32));
+    UINT16 wolves_num = 20;//ç‹¼ç¾¤å¤§å°
+    UINT16 iteration = 30;//è¿­ä»£æ¬¡æ•°
+    //åˆå§‹åŒ–Alpha,Beta,Deltaç‹¼ä½ç½®
+    FLOAT32* position_Alpha =(FLOAT32*)malloc(solve_dim * sizeof(FLOAT32));
+    FLOAT32* position_Beta = (FLOAT32*)malloc(solve_dim * sizeof(FLOAT32));
+    FLOAT32* position_Delta = (FLOAT32*)malloc(solve_dim * sizeof(FLOAT32));
+    //åˆå§‹åŒ–Alpha,Beta,Deltaç‹¼é€‚åº”åº¦
+    UINT16 score_Alpha = 65535;
+    UINT16 score_Beta = 65535;
+    UINT16 score_Delta = 65535;
+    UINT16 fitness;//é€‚åº”åº¦
+    FLOAT32 convergence_factor = 1;//æ”¶æ•›å› å­åˆå§‹å€¼
+    //ä¸‹é¢ä¸ºGWOæ±‚è§£è¿‡ç¨‹å‚æ•°ï¼Œé¢„å…ˆåˆå§‹åŒ–
+    FLOAT32 a;
+    FLOAT32 A1, A2, A3;
+    FLOAT32 C1, C2, C3;
+    FLOAT32 X1;
+    FLOAT32 X2;
+    FLOAT32 X3;
+    FLOAT32 D_alpha;
+    FLOAT32 D_beta;
+    FLOAT32 D_delta;
+    UINT16* OptimalSpd = NULL;
+    OptimalSpd = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));
+    /*ç”³è¯·å†…å­˜æ— æ•ˆé˜²æŠ¤*/
+    if (OptimalSpd == NULL)
+        return;
+    FLOAT32** Positions = NULL;
+    Positions = (FLOAT32**)malloc(wolves_num * sizeof(FLOAT32*));
+    for (int i = 0; i < wolves_num; i++)
+        Positions[i] = (FLOAT32*)malloc(solve_dim * sizeof(FLOAT32));
 
-    Initialize(wolves_num, solve_dim, upper_bound, lower_bound, Positions);//³õÊ¼»¯ÀÇÈºÎ»ÖÃ·Ö²¼
+    Initialize(wolves_num, solve_dim, upper_bound, lower_bound, Positions);//åˆå§‹åŒ–ç‹¼ç¾¤ä½ç½®åˆ†å¸ƒ
 
-	for (UINT16 i = 0; i < iteration; i++)//Ñ­»·¼ÆÊıÆ÷
-	{
-		for (UINT16 m = 0; m < wolves_num; m++)//ÕÒµ½±¾´Îµü´ú²úÉúµÄAlpha¡¢Beta¡¢DeltaÀÇ
-		{
-			//fitness = (UINT16)GetFitnessOffline(OptimalSpd, Positions[m], discrete_size, dim, speed_limit_max,speed_limit_min, target_time);//¼ÆËãÃ¿Ö»ÀÇµÄÊÊÓ¦¶ÈÖµ£¬ÒÔÄ¿±êÖµ×îĞ¡ÎªÄ¿±ê
-			fitness = (UINT16)GetFitnessOffline2(OptimalSpd, Positions[m], discrete_size, dim, speed_limit_max, speed_limit_min, target_time, switch_flag, solve_dim);//¼ÆËãÃ¿Ö»ÀÇµÄÊÊÓ¦¶ÈÖµ£¬ÒÔÄ¿±êÖµ×îĞ¡ÎªÄ¿±ê
+    for (UINT16 i = 0; i < iteration; i++)//å¾ªç¯è®¡æ•°å™¨
+    {
+        for (UINT16 m = 0; m < wolves_num; m++)//æ‰¾åˆ°æœ¬æ¬¡è¿­ä»£äº§ç”Ÿçš„Alphaã€Betaã€Deltaç‹¼
+        {
+            //fitness = (UINT16)GetFitnessOffline(OptimalSpd, Positions[m], discrete_size, dim, speed_limit_max,speed_limit_min, target_time);//è®¡ç®—æ¯åªç‹¼çš„é€‚åº”åº¦å€¼ï¼Œä»¥ç›®æ ‡å€¼æœ€å°ä¸ºç›®æ ‡
+            fitness = (UINT16)GetFitnessOffline2(OptimalSpd, Positions[m], discrete_size, dim, speed_limit_max, speed_limit_min, target_time, switch_flag, solve_dim);//è®¡ç®—æ¯åªç‹¼çš„é€‚åº”åº¦å€¼ï¼Œä»¥ç›®æ ‡å€¼æœ€å°ä¸ºç›®æ ‡
 
-			if (fitness <= score_Alpha)
-			{
-				score_Alpha = fitness;
-				position_Alpha = Positions[m];
-			}
-			if (fitness > score_Alpha && fitness < score_Beta)
-			{
-				score_Beta = fitness;
-				position_Beta = Positions[m];
-			}
-			if (fitness > score_Alpha && fitness > score_Beta && fitness < score_Delta)
-			{
-				score_Delta = fitness;
-				position_Delta = Positions[m];
-			}
-		}
-		a = (FLOAT32)(convergence_factor - (2.0 / iteration) * i);//ÊÕÁ²Òò×ÓËæ×Åµü´ú¹ı³Ì½øĞĞ£¬ÓÉ³õÊ¼ÖµÏßĞÔ¼õĞ¡µ½0
-		if (a < 0)
-		{
-			a = 0;
-		}
-		for (UINT16 m = 0; m < wolves_num; m++)
-		{
-			for (UINT16 n = 0; n < solve_dim; n++)
-			{
-				//r2 = rand();
-				A1 = 2 * a * (FLOAT32)rand() / RAND_MAX - a;//¼ÆËãÏµÊıA£¬Equation (3.3)
-				C1 = 2 * (FLOAT32)rand() / RAND_MAX;//¼ÆËãÏµÊıC£¬Equation (3.4)
-				//AlphaÀÇÎ»ÖÃ¸üĞÂ
-				D_alpha = abs(C1 * position_Alpha[n] - Positions[m][n]);
-				X1 = position_Alpha[n] - A1 * D_alpha;
+            if (fitness <= score_Alpha)
+            {
+                score_Alpha = fitness;
+                position_Alpha = Positions[m];
+            }
+            if (fitness > score_Alpha && fitness < score_Beta)
+            {
+                score_Beta = fitness;
+                position_Beta = Positions[m];
+            }
+            if (fitness > score_Alpha && fitness > score_Beta && fitness < score_Delta)
+            {
+                score_Delta = fitness;
+                position_Delta = Positions[m];
+            }
+        }
+        a = (FLOAT32)(convergence_factor - (2.0 / iteration) * i);//æ”¶æ•›å› å­éšç€è¿­ä»£è¿‡ç¨‹è¿›è¡Œï¼Œç”±åˆå§‹å€¼çº¿æ€§å‡å°åˆ°0
+        if (a < 0)
+        {
+            a = 0;
+        }
+        for (UINT16 m = 0; m < wolves_num; m++)
+        {
+            for (UINT16 n = 0; n < solve_dim; n++)
+            {
+                //r2 = rand();
+                A1 = 2 * a * (FLOAT32)rand() / RAND_MAX - a;//è®¡ç®—ç³»æ•°Aï¼ŒEquation (3.3)
+                C1 = 2 * (FLOAT32)rand() / RAND_MAX;//è®¡ç®—ç³»æ•°Cï¼ŒEquation (3.4)
+                //Alphaç‹¼ä½ç½®æ›´æ–°
+                D_alpha = abs(C1 * position_Alpha[n] - Positions[m][n]);
+                X1 = position_Alpha[n] - A1 * D_alpha;
 
-				A2 = 2 * a * (FLOAT32)rand() / RAND_MAX - a;
-				C2 = 2 * (FLOAT32)rand() / RAND_MAX;
-				//BetaÀÇÎ»ÖÃ¸üĞÂ
-				D_beta = abs(C2 * position_Beta[n] - Positions[m][n]);
-				X2 = position_Beta[n] - A2 * D_beta;
+                A2 = 2 * a * (FLOAT32)rand() / RAND_MAX - a;
+                C2 = 2 * (FLOAT32)rand() / RAND_MAX;
+                //Betaç‹¼ä½ç½®æ›´æ–°
+                D_beta = abs(C2 * position_Beta[n] - Positions[m][n]);
+                X2 = position_Beta[n] - A2 * D_beta;
 
-				A3 = 2 * a * (FLOAT32)rand() / RAND_MAX - a;
-				C3 = 2 * (FLOAT32)rand() / RAND_MAX;
-				//DeltaÀÇÎ»ÖÃ¸üĞÂ
-				D_delta = abs(C3 * position_Delta[n] - Positions[m][n]);
-				X3 = position_Delta[n] - A3 * D_delta;
+                A3 = 2 * a * (FLOAT32)rand() / RAND_MAX - a;
+                C3 = 2 * (FLOAT32)rand() / RAND_MAX;
+                //Deltaç‹¼ä½ç½®æ›´æ–°
+                D_delta = abs(C3 * position_Delta[n] - Positions[m][n]);
+                X3 = position_Delta[n] - A3 * D_delta;
 
-				Positions[m][n] = (X1 + X2 + X3) / 3;//Î»ÖÃ¸üĞÂ£¬Equation (3.7)
+                Positions[m][n] = (X1 + X2 + X3) / 3;//ä½ç½®æ›´æ–°ï¼ŒEquation (3.7)
 
-				if (Positions[m][n] > upper_bound[n])//±ß½çÅĞ¶Ï
-				{
-					Positions[m][n] = (FLOAT32)upper_bound[n];
-				}
-				if (Positions[m][n] < lower_bound[n])
-				{
-					Positions[m][n] = (FLOAT32)lower_bound[n];
-				}
-				/*if (Positions[m][3] < Positions[m][2])
-				{
-					Positions[m][3] = Positions[m][2];
-				}*/
-			}
+                if (Positions[m][n] > upper_bound[n])//è¾¹ç•Œåˆ¤æ–­
+                {
+                    Positions[m][n] = (FLOAT32)upper_bound[n];
+                }
+                if (Positions[m][n] < lower_bound[n])
+                {
+                    Positions[m][n] = (FLOAT32)lower_bound[n];
+                }
+                /*if (Positions[m][3] < Positions[m][2])
+                {
+                    Positions[m][3] = Positions[m][2];
+                }*/
+            }
 
-		}
-	}
-	//¼ÆËãÃ¿Ö»ÀÇµÄÊÊÓ¦¶ÈÖµ£¬ÒÔÄ¿±êÖµ×îĞ¡ÎªÄ¿±ê
-	//fitness = (UINT16)GetFitnessOffline(OptimalSpd, position_Alpha, discrete_size, dim, speed_limit_max, speed_limit_min, target_time);
-	fitness = (UINT16)GetFitnessOffline2(OptimalSpd, position_Alpha, discrete_size, dim, speed_limit_max, speed_limit_min, target_time, switch_flag, solve_dim);
-	for (UINT16 i = 0; i < solve_dim; i++)
-	{
-		printf("×îÓÅ½â£º%f\n", position_Alpha[i]);
-	}
-	for (UINT16 i = 0; i < dim + 1; i++)//Êä³ö×îÓÅ½â
-	{
-		optimal_speed[i] = OptimalSpd[i];
-		printf("Î»ÖÃ£º%dm,ÓÅ»¯ËÙ¶È£º%dcm/s,Êä³ö¹¤¿ö£º%d\n", i, OptimalSpd[i], level_output_flag[i]);
-	}
+        }
+    }
+    //è®¡ç®—æ¯åªç‹¼çš„é€‚åº”åº¦å€¼ï¼Œä»¥ç›®æ ‡å€¼æœ€å°ä¸ºç›®æ ‡
+    //fitness = (UINT16)GetFitnessOffline(OptimalSpd, position_Alpha, discrete_size, dim, speed_limit_max, speed_limit_min, target_time);
+    fitness = (UINT16)GetFitnessOffline2(OptimalSpd, position_Alpha, discrete_size, dim, speed_limit_max, speed_limit_min, target_time, switch_flag, solve_dim);
+    for (UINT16 i = 0; i < solve_dim; i++)
+    {
+        printf("best_solve:%f\n", position_Alpha[i]);
 
-	printf("Çø¼ä³¤¶È£º%d,Ä¿±êÔËĞĞÊ±·Ö£º%d,ÓÅ»¯ÔËĞĞÊ±·Ö£º%f\n", interval_length, target_time, plan_time[dim - 1]);
-	
-	for (UINT16 i = 0; i < dim + 1; i++)//Êä³ö×îÓÅ½â
-	{
-		optimal_speed[i] = OptimalSpd[i];
-	}
+    }
+    for (UINT16 i = 0; i < dim + 1; i++)//è¾“å‡ºæœ€ä¼˜è§£
+    {
+        optimal_speed[i] = OptimalSpd[i];
+        printf("loc:%dm-speed:%dcm/s-switch:%d\n", i*discrete_size/100, OptimalSpd[i], level_output_flag[i]);
+        LogWrite(INFO,"%s:%d%s:%d%s:%d","loc",i*discrete_size/100,"m,speed",OptimalSpd[i],"cm/s,switch",level_output_flag[i]);
 
-	//ÊÍ·ÅÄÚ´æ
-	for (int i = 0; i < wolves_num; i++)
-		free(Positions[i]);
-	free(Positions);
-	free(OptimalSpd);
+    }
+
+    printf("interval_length:%d-target_time:%d-optimize_time%.3f\n", interval_length, target_time, plan_time[dim - 1]);
+    LogWrite(INFO,"%s:%d%s:%d%s:%f","interval_length",interval_length,"m,target_time",target_time,"s,optimize_time",plan_time[dim - 1]);
+    g_speed_plan_info.optimize_evaluate=abs(plan_time[dim - 1] - target_time);
+    for (UINT16 i = 0; i < dim + 1; i++)//è¾“å‡ºæœ€ä¼˜è§£
+    {
+        optimal_speed[i] = OptimalSpd[i];
+    }
+
+    //é‡Šæ”¾å†…å­˜
+    for (int i = 0; i < wolves_num; i++)
+        free(Positions[i]);
+    free(Positions);
+    free(OptimalSpd);
 
 
 }
 
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ¸ù¾İ²ÎÊıÉÏÏÂ½ç£¬³õÊ¼»¯ÀÇÈºÎ»ÖÃ
-  * ÊäÈë²ÎÊı:
-  *		UINT16						wolves_num				ÀÇÈºÊıÁ¿
-  *		UINT8						solve_dim				½âÎ¬¶È
-  *		UINT32						upper_bound[]			Ô¼ÊøÉÏ½ç
-  *		UINT32						lower_bound[]			Ô¼ÊøÏÂ½ç
-  * Êä³ö²ÎÊı:
-  * ·µ»ØÖµ:
-  *		vector<vector<FLOAT32>>		positions				³õÊ¼½â¿Õ¼ä
-  *************************************************************************/
+* åŠŸèƒ½æè¿°: æ ¹æ®å‚æ•°ä¸Šä¸‹ç•Œï¼Œåˆå§‹åŒ–ç‹¼ç¾¤ä½ç½®
+* è¾“å…¥å‚æ•°:
+*		UINT16						wolves_num				ç‹¼ç¾¤æ•°é‡
+*		UINT8						solve_dim				è§£ç»´åº¦
+*		UINT32						upper_bound[]			çº¦æŸä¸Šç•Œ
+*		UINT32						lower_bound[]			çº¦æŸä¸‹ç•Œ
+* è¾“å‡ºå‚æ•°:
+* è¿”å›å€¼:
+*		vector<vector<FLOAT32>>		positions				åˆå§‹è§£ç©ºé—´
+*************************************************************************/
 void Initialize(UINT16 wolves_num, UINT8 solve_dim, UINT32 upper_bound[], UINT32 lower_bound[],FLOAT32** Positions)
 {
-	srand((UINT32)(time(0)));//ĞŞ¸ÄÖÖ×Ó
-	for (UINT16 i = 0; i < wolves_num; i++)
-	{
-		for (UINT16 j = 0; j < solve_dim; j++)
-		{
-			Positions[i][j] = (FLOAT32)(rand() % (upper_bound[j] - lower_bound[j] + 1) + lower_bound[j]);
-		}
-	}
+    srand((UINT32)(time(0)));//ä¿®æ”¹ç§å­
+    for (UINT16 i = 0; i < wolves_num; i++)
+    {
+        for (UINT16 j = 0; j < solve_dim; j++)
+        {
+            Positions[i][j] = (FLOAT32)(rand() % (upper_bound[j] - lower_bound[j] + 1) + lower_bound[j]);
+            printf("%f\n",Positions[i][j]);
+        }
+    }
 }
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ¼ÆËãÊÊÓ¦¶Èº¯Êı(ÀëÏßÇó½â)
-  * ÊäÈë²ÎÊı:
-  *		vector<FLOAT32>				position				½â¿Õ¼ä
-  *		UINT16						discrete_size			¾àÀëÀëÉ¢´óĞ¡
-  *		UINT16						dim						½â¿Õ¼äÎ¬¶È
-  *		UINT16*						speed_limit_max			×î¿ìËÙ¶ÈÇúÏß
-  *		UINT16*						speed_limit_min			×îÂıËÙ¶ÈÇúÏß
-  *		UINT16						target_time				Ä¿±êÔËĞĞÊ±·Ö
-  * Êä³ö²ÎÊı:
-  *		UINT16*						optimal_speed			ÓÅ»¯ËÙ¶È
-  * ·µ»ØÖµ:
-  *		FLOAT32						fitness					Ä¿±êº¯ÊıÖµ
-  *************************************************************************/
+* åŠŸèƒ½æè¿°: è®¡ç®—é€‚åº”åº¦å‡½æ•°(ç¦»çº¿æ±‚è§£)
+* è¾“å…¥å‚æ•°:
+*		vector<FLOAT32>				position				è§£ç©ºé—´
+*		UINT16						discrete_size			è·ç¦»ç¦»æ•£å¤§å°
+*		UINT16						dim						è§£ç©ºé—´ç»´åº¦
+*		UINT16*						speed_limit_max			æœ€å¿«é€Ÿåº¦æ›²çº¿
+*		UINT16*						speed_limit_min			æœ€æ…¢é€Ÿåº¦æ›²çº¿
+*		UINT16						target_time				ç›®æ ‡è¿è¡Œæ—¶åˆ†
+* è¾“å‡ºå‚æ•°:
+*		UINT16*						optimal_speed			ä¼˜åŒ–é€Ÿåº¦
+* è¿”å›å€¼:
+*		FLOAT32						fitness					ç›®æ ‡å‡½æ•°å€¼
+*************************************************************************/
 FLOAT32 GetFitnessOffline2(UINT16* optimal_speed, FLOAT32* position, UINT16 discrete_size, UINT16 dim, UINT16* speed_limit_max, UINT16* speed_limit_min, UINT16 target_time, UINT8 switch_flag[], UINT8 switch_num)
 {
-	FLOAT32 v_index = 0.01f; //µü´úËÙ¶È
-	UINT32 train_weight = (UINT32)CalTrainWeight();//³µÖØ
-	FLOAT32 time_sum = 0;//ÔËĞĞÊ±·Ö×ÜºÍ
-	FLOAT32 energy_sum = 0;//ÄÜºÄ×ÜºÍ
-	FLOAT32 acc_gradient;//ÆÂ¶È¸½¼Ó¼ÓËÙ¶È
-	FLOAT32 acc_qxbj;//ÇúÏß°ë¾¶¸½¼Ó¼ÓËÙ¶È
-	FLOAT32 acc_w;//»ù±¾×èÁ¦¸½¼Ó¼ÓËÙ¶È
-	FLOAT32 acc_traction;//Ç£Òı¼ÓËÙ¶È
-	FLOAT32 acc_index;//µÈĞ§¼ÓËÙ¶È
-	FLOAT32 v_next;//ÏÂÒ»ËÙ¶È
-	FLOAT32 P = 0.85f;//ÔËĞĞÊ±·Ö³Í·£ÏµÊı
-	FLOAT32 fitness;//Ä¿±êº¯ÊıÖµ
-	UINT8 pos_index = 0;//½âË÷Òı
-	for (UINT16 i = 0; i < dim; i++)
-	{
-		acc_gradient = GetGradientAcc(i * discrete_size);
-		acc_qxbj = GetCurveRadiusAcc(i * discrete_size);
-		acc_w = GetResistanceAcc((UINT16)v_index);
-		acc_traction = GetTractionAcc((UINT16)v_index) * SPEED_PLAN_TB_RATIO;
-		if (i * discrete_size <= position[pos_index])
-		{
-			if (switch_flag[pos_index] == 1)//Ç£Òı-¶èĞĞ
-			{
-				acc_index = acc_traction - acc_w - acc_gradient - acc_qxbj;
-				v_next = sqrt(v_index * v_index + 2 * acc_index * discrete_size);
-				if (v_next >= speed_limit_max[i + 1])//ÏÂÒ»¹æ»®ËÙ¶È³¬ËÙ
-				{
-					acc_index = (speed_limit_max[i + 1] * speed_limit_max[i + 1] - v_index * v_index) / (2 * discrete_size);
-					acc_traction = acc_index + acc_w + acc_gradient + acc_qxbj;
-				}
-				if (acc_traction > 0)
-				{
-					energy_sum = energy_sum + (FLOAT32)train_weight * acc_traction * discrete_size / 10000;
-				}
-				level_output_flag[i] = 1;
-			}
-			else if (switch_flag[pos_index] == 3)//ÖÆ¶¯-¶èĞĞ
-			{
-			}
-			else
-			{
-				acc_index = -acc_w - acc_gradient - acc_qxbj;
-				if (v_index * v_index + 2 * acc_index * discrete_size > 0)
-				{
-					v_next = sqrt(v_index * v_index + 2 * acc_index * discrete_size);
-				}
-				else
-				{
-					v_next = 0.1f;
-				}
-				level_output_flag[i] = 2;
-			}
-			//¸üĞÂÏÂÒ»¹¤¿öÇĞ»»µã
-			if ((i + 1) * discrete_size > position[pos_index] && pos_index < switch_num - 1)
-			{
-				pos_index += 1;
-			}
-		}
-		else
-		{
-			acc_index = -acc_w - acc_gradient - acc_qxbj;
-			if (v_index * v_index + 2 * acc_index * discrete_size > 0)
-			{
-				v_next = sqrt(v_index * v_index + 2 * acc_index * discrete_size);
-			}
-			else
-			{
-				v_next = 0.1f;
-			}
-			level_output_flag[i] = 2;
-		}
-		//±ß½çÔ¼Êø
-		if (v_next > speed_limit_max[i + 1])
-		{
-			v_next = speed_limit_max[i + 1];
-			//Èç¹ûµ±Ç°´¦ÓÚÇ£Òı½×¶Î£¬¹æ»®ËÙ¶È´óÓÚ·À»¤ËÙ¶È£¬Ôò¼İÊ»½×¶ÎÇĞ»»Îª¶èĞĞ¡£
-			if (switch_flag[pos_index] == 1 && i * discrete_size <= position[pos_index])
-			{
-				level_output_flag[i] = 2;
-			}
-			//·ñÔò¼İÊ»½×¶ÎÇĞ»»ÎªÖÆ¶¯
-			else
-			{
-				level_output_flag[i] = 3;
-			}
-		}
-		/*if (v_next < SpeedLimitMin[i + 1])
-		{
-			v_next = SpeedLimitMin[i + 1];
-		}*/
-		if (i == dim - 1)
-		{
-			time_sum = time_sum + (FLOAT32)(discrete_size + remain_section_length) / ((v_index + v_next) / 2);
-		}
-		else
-		{
-			time_sum = time_sum + (FLOAT32)discrete_size / ((v_index + v_next) / 2);
-		}
-		optimal_speed[i] = (UINT16)v_index;
-		plan_time[i] = time_sum;
-		v_index = v_next;
-	}
-	optimal_speed[dim] = (UINT16)v_index;
-	fitness = (1 - P) * energy_sum / 1000000 + P * abs(time_sum - target_time);
-
-	return fitness;
+    FLOAT32 v_index = 0.01f; //è¿­ä»£é€Ÿåº¦
+    UINT32 train_weight = (UINT32)CalTrainWeight();//è½¦é‡
+    FLOAT32 time_sum = 0;//è¿è¡Œæ—¶åˆ†æ€»å’Œ
+    FLOAT32 energy_sum = 0;//èƒ½è€—æ€»å’Œ
+    FLOAT32 acc_gradient;//å¡åº¦é™„åŠ åŠ é€Ÿåº¦
+    FLOAT32 acc_qxbj;//æ›²çº¿åŠå¾„é™„åŠ åŠ é€Ÿåº¦
+    FLOAT32 acc_w;//åŸºæœ¬é˜»åŠ›é™„åŠ åŠ é€Ÿåº¦
+    FLOAT32 acc_traction;//ç‰µå¼•åŠ é€Ÿåº¦
+    FLOAT32 acc_index;//ç­‰æ•ˆåŠ é€Ÿåº¦
+    FLOAT32 v_next;//ä¸‹ä¸€é€Ÿåº¦
+    FLOAT32 P = 0.85f;//è¿è¡Œæ—¶åˆ†æƒ©ç½šç³»æ•°
+    FLOAT32 fitness;//ç›®æ ‡å‡½æ•°å€¼
+    UINT8 pos_index = 0;//è§£ç´¢å¼•
+    for (UINT32 i = 0; i < dim; i++)
+    {
+        acc_gradient = GetGradientAcc(i * discrete_size);
+        acc_qxbj = GetCurveRadiusAcc(i * discrete_size);
+        acc_w = GetResistanceAcc((UINT16)v_index);
+        acc_traction = GetTractionAcc((UINT16)v_index) * SPEED_PLAN_TB_RATIO;
+        if (i * discrete_size <= position[pos_index])
+        {
+            if (switch_flag[pos_index] == 1)//ç‰µå¼•-æƒ°è¡Œ
+            {
+                acc_index = acc_traction - acc_w - acc_gradient - acc_qxbj;
+                v_next = sqrt(v_index * v_index + 2 * acc_index * discrete_size);
+                if (v_next >= speed_limit_max[i + 1])//ä¸‹ä¸€è§„åˆ’é€Ÿåº¦è¶…é€Ÿ
+                {
+                    acc_index = (speed_limit_max[i + 1] * speed_limit_max[i + 1] - v_index * v_index) / (2 * discrete_size);
+                    acc_traction = acc_index + acc_w + acc_gradient + acc_qxbj;
+                }
+                if (acc_traction > 0)
+                {
+                    energy_sum = energy_sum + (FLOAT32)train_weight * acc_traction * discrete_size / 10000;
+                }
+                level_output_flag[i] = 1;
+            }
+            else if (switch_flag[pos_index] == 3)//åˆ¶åŠ¨-æƒ°è¡Œ
+            {
+            }
+            else
+            {
+                acc_index = -acc_w - acc_gradient - acc_qxbj;
+                if (v_index * v_index + 2 * acc_index * discrete_size > 0)
+                {
+                    v_next = sqrt(v_index * v_index + 2 * acc_index * discrete_size);
+                }
+                else
+                {
+                    v_next = 0.1f;
+                }
+                level_output_flag[i] = 2;
+            }
+            //æ›´æ–°ä¸‹ä¸€å·¥å†µåˆ‡æ¢ç‚¹
+            if ((i + 1) * discrete_size > position[pos_index] && pos_index < switch_num - 1)
+            {
+                pos_index += 1;
+            }
+        }
+        else
+        {
+            acc_index = -acc_w - acc_gradient - acc_qxbj;
+            if (v_index * v_index + 2 * acc_index * discrete_size > 0)
+            {
+                v_next = sqrt(v_index * v_index + 2 * acc_index * discrete_size);
+            }
+            else
+            {
+                v_next = 0.1f;
+            }
+            level_output_flag[i] = 2;
+        }
+        //è¾¹ç•Œçº¦æŸ
+        if (v_next > speed_limit_max[i + 1])
+        {
+            v_next = speed_limit_max[i + 1];
+            //å¦‚æœå½“å‰å¤„äºç‰µå¼•é˜¶æ®µï¼Œè§„åˆ’é€Ÿåº¦å¤§äºé˜²æŠ¤é€Ÿåº¦ï¼Œåˆ™é©¾é©¶é˜¶æ®µåˆ‡æ¢ä¸ºæƒ°è¡Œã€‚
+            if (switch_flag[pos_index] == 1 && i * discrete_size <= position[pos_index])
+            {
+                level_output_flag[i] = 2;
+            }
+                //å¦åˆ™é©¾é©¶é˜¶æ®µåˆ‡æ¢ä¸ºåˆ¶åŠ¨
+            else
+            {
+                level_output_flag[i] = 3;
+            }
+        }
+        /*if (v_next < SpeedLimitMin[i + 1])
+        {
+            v_next = SpeedLimitMin[i + 1];
+        }*/
+        if (i == dim - 1)
+        {
+            time_sum = time_sum + (FLOAT32)(discrete_size + remain_section_length) / ((v_index + v_next) / 2);
+        }
+        else
+        {
+            time_sum = time_sum + (FLOAT32)discrete_size / ((v_index + v_next) / 2);
+        }
+        optimal_speed[i] = (UINT16)v_index;
+        plan_time[i] = time_sum;
+        v_index = v_next;
+    }
+    optimal_speed[dim] = (UINT16)v_index;
+    level_output_flag[dim] = 3;
+    fitness = (1 - P) * energy_sum / 1000000 + P * abs(time_sum - target_time);
+    return fitness;
 }
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ¼ÆËãÁĞ³µÖÊÁ¿
-  * ÊäÈë²ÎÊı: ÎŞ
-  * Êä³ö²ÎÊı: ÎŞ
-  * ·µ»ØÖµ:   FLOAT64	train_weight	ÁĞ³µÖÊÁ¿, kg
- *************************************************************************/
+* åŠŸèƒ½æè¿°: è®¡ç®—åˆ—è½¦è´¨é‡
+* è¾“å…¥å‚æ•°: æ— 
+* è¾“å‡ºå‚æ•°: æ— 
+* è¿”å›å€¼:   FLOAT64	train_weight	åˆ—è½¦è´¨é‡, kg
+*************************************************************************/
 FLOAT64 CalTrainWeight()
 {
-	return (FLOAT64)g_train_param.aw[g_aw_id] * 1000.0;	// ÖÊÁ¿µ¥Î»ÊÇ¶Ö, ³Ë1000×ª»¯Îªkg
+    return (FLOAT64)g_train_param.aw[g_aw_id] * 1000.0;	// è´¨é‡å•ä½æ˜¯å¨, ä¹˜1000è½¬åŒ–ä¸ºkg
 }
+
 /*************************************************************************
- * ¹¦ÄÜÃèÊö: ¸ù¾İATOÅäÖÃÊı¾İÖĞµÄÌØĞÔÇúÏß¼ÆËãÄ³Ò»ËÙ¶ÈÏÂµÄ×î´ó¼ÓËÙ¶È
- * ÊäÈë²ÎÊı: FLOAT64	speed		ÁĞ³µËÙ¶È, km/h
- *			  UINT16    num			ÌØĞÔÇúÏßÉ¢µãÊı
- *			  UINT16*	curve_v		ÇúÏßËÙ¶ÈÏîÊı×é, km/h
- *			  UINT16*	curve_a		ÇúÏß¼ÓËÙ¶ÈÏîÊı×é, cm/s/s
- * Êä³ö²ÎÊı: ÎŞ
- * ·µ»ØÖµ:   FLOAT64	acc			×î´ó¼ÓËÙ¶È, cm/s/s
- *************************************************************************/
+* åŠŸèƒ½æè¿°: æ ¹æ®ATOé…ç½®æ•°æ®ä¸­çš„ç‰¹æ€§æ›²çº¿è®¡ç®—æŸä¸€é€Ÿåº¦ä¸‹çš„æœ€å¤§åŠ é€Ÿåº¦
+* è¾“å…¥å‚æ•°: FLOAT64	speed		åˆ—è½¦é€Ÿåº¦, km/h
+*			  UINT16    num			ç‰¹æ€§æ›²çº¿æ•£ç‚¹æ•°
+*			  UINT16*	curve_v		æ›²çº¿é€Ÿåº¦é¡¹æ•°ç»„, km/h
+*			  UINT16*	curve_a		æ›²çº¿åŠ é€Ÿåº¦é¡¹æ•°ç»„, cm/s/s
+* è¾“å‡ºå‚æ•°: æ— 
+* è¿”å›å€¼:   FLOAT64	acc			æœ€å¤§åŠ é€Ÿåº¦, cm/s/s
+*************************************************************************/
 FLOAT64 GetAccBySpeed(FLOAT64 kph, UINT16 num, const UINT16* curve_v, const UINT16* curve_a)
 {
-	FLOAT64 acc = 0;					// ¼ÓËÙ¶È·µ»ØÖµ£¬cm/s/s
-	if (kph <= curve_v[0])
-	{
-		acc = curve_a[0];
-	}
-	else if (kph >= curve_v[num - 1])
-	{
-		acc = curve_a[num - 1];
-	}
-	else
-	{
-		for (UINT16 i = 1; i < num; i++)
-		{
-			if (kph <= curve_v[i])
-			{
-				FLOAT64 ratio = (FLOAT64)(curve_v[i] - kph) / (FLOAT64)(curve_v[i] - curve_v[i - 1]);
-				acc = curve_a[i - 1] * ratio + curve_a[i] * (1 - ratio);
-				break;
-			}
-		}
-	}
-	return acc;
+    FLOAT64 acc = 0;					// åŠ é€Ÿåº¦è¿”å›å€¼ï¼Œcm/s/s
+    if (kph <= curve_v[0])
+    {
+        acc = curve_a[0];
+    }
+    else if (kph >= curve_v[num - 1])
+    {
+        acc = curve_a[num - 1];
+    }
+    else
+    {
+        for (UINT16 i = 1; i < num; i++)
+        {
+            if (kph <= curve_v[i])
+            {
+                FLOAT64 ratio = (FLOAT64)(curve_v[i] - kph) / (FLOAT64)(curve_v[i] - curve_v[i - 1]);
+                acc = curve_a[i - 1] * ratio + curve_a[i] * (1 - ratio);
+                break;
+            }
+        }
+    }
+    return acc;
 }
 
 /*************************************************************************
- * ¹¦ÄÜÃèÊö: ¸ù¾İËÙ¶È¼ÆËãÇ£Òı¼ÓËÙ¶È
- * ÊäÈë²ÎÊı:
- *		UINT16						speed					ËÙ¶È cm/s
- * Êä³ö²ÎÊı:
- * ·µ»ØÖµ:
- *		UINT16						acc_traction		    ×î´ó¼ÓËÙ¶È cm/s^2
- *************************************************************************/
+* åŠŸèƒ½æè¿°: æ ¹æ®é€Ÿåº¦è®¡ç®—ç‰µå¼•åŠ é€Ÿåº¦
+* è¾“å…¥å‚æ•°:
+*		UINT16						speed					é€Ÿåº¦ cm/s
+* è¾“å‡ºå‚æ•°:
+* è¿”å›å€¼:
+*		UINT16						acc_traction		    æœ€å¤§åŠ é€Ÿåº¦ cm/s^2
+*************************************************************************/
 FLOAT32 GetTractionAcc(UINT16 speed)
 {
-	FLOAT64 kph = 1.0 * speed / 100 * 3.6;
-	FLOAT64 acc = 0;							// ¼ÓËÙ¶È·µ»ØÖµ£¬cm/s/s
-	const TRAIN_PARAMETER* tp = &g_train_param;	// ÁĞ³µ²ÎÊıÖ¸Õë
-	switch (g_aw_id)
-	{
-	case 0:
-		acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a0);
-		break;
-	case 1:
-		acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a1);
-		break;
-	case 2:
-		acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a2);
-		break;
-	case 3:
-		acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a3);
-		break;
-	default:
-		acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a0);
-		break;
-	}
-	tp = NULL;
-	return (FLOAT32)acc; // Ç£Òı·µ»ØÕıÖµ
+    FLOAT64 kph = 1.0 * speed / 100 * 3.6;
+    FLOAT64 acc = 0;							// åŠ é€Ÿåº¦è¿”å›å€¼ï¼Œcm/s/s
+    const TRAIN_PARAMETER* tp = &g_train_param;	// åˆ—è½¦å‚æ•°æŒ‡é’ˆ
+    switch (g_aw_id)
+    {
+        case 0:
+            acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a0);
+            break;
+        case 1:
+            acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a1);
+            break;
+        case 2:
+            acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a2);
+            break;
+        case 3:
+            acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a3);
+            break;
+        default:
+            acc = GetAccBySpeed(kph, tp->traction_num, tp->traction_v, tp->traction_a0);
+            break;
+    }
+    tp = NULL;
+    return (FLOAT32)acc; // ç‰µå¼•è¿”å›æ­£å€¼
 }
 
 /*************************************************************************
- * ¹¦ÄÜÃèÊö: ¸ù¾İËÙ¶È¼ÆËãÖÆ¶¯¼ÓËÙ¶È
- * ÊäÈë²ÎÊı:
- *		UINT16						speed					ËÙ¶È cm/s
- * Êä³ö²ÎÊı:
- * ·µ»ØÖµ:
- *		UINT16						acc_break				×î´ó¼õËÙ¶È cm/s^2
- *************************************************************************/
+* åŠŸèƒ½æè¿°: æ ¹æ®é€Ÿåº¦è®¡ç®—åˆ¶åŠ¨åŠ é€Ÿåº¦
+* è¾“å…¥å‚æ•°:
+*		UINT16						speed					é€Ÿåº¦ cm/s
+* è¾“å‡ºå‚æ•°:
+* è¿”å›å€¼:
+*		UINT16						acc_break				æœ€å¤§å‡é€Ÿåº¦ cm/s^2
+*************************************************************************/
 FLOAT32 GetBreakAcc(UINT16 speed)
 {
-	FLOAT64 kph = 1.0 * speed / 100 * 3.6;
-	FLOAT64 acc = 0;							// ¼ÓËÙ¶È·µ»ØÖµ£¬cm/s/s
-	const TRAIN_PARAMETER* tp = &g_train_param;	// ÁĞ³µ²ÎÊıÖ¸Õë
-	switch (g_aw_id)
-	{
-	case 0:
-		acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a0);
-		break;
-	case 1:
-		acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a1);
-		break;
-	case 2:
-		acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a2);
-		break;
-	case 3:
-		acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a3);
-		break;
-	default:
-		acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a0);
-		break;
-	}
-	tp = NULL;
-	return (FLOAT32)acc; // ÖÆ¶¯·µ»ØÕıÖµ
+    FLOAT64 kph = 1.0 * speed / 100 * 3.6;
+    FLOAT64 acc = 0;							// åŠ é€Ÿåº¦è¿”å›å€¼ï¼Œcm/s/s
+    const TRAIN_PARAMETER* tp = &g_train_param;	// åˆ—è½¦å‚æ•°æŒ‡é’ˆ
+    switch (g_aw_id)
+    {
+        case 0:
+            acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a0);
+            break;
+        case 1:
+            acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a1);
+            break;
+        case 2:
+            acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a2);
+            break;
+        case 3:
+            acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a3);
+            break;
+        default:
+            acc = GetAccBySpeed(kph, tp->braking_num, tp->braking_v, tp->braking_a0);
+            break;
+    }
+    tp = NULL;
+    return (FLOAT32)acc; // åˆ¶åŠ¨è¿”å›æ­£å€¼
 }
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ¸ù¾İËÙ¶È¼ÆËã»ù±¾×èÁ¦¸½¼Ó¼ÓËÙ¶È
-  * ÊäÈë²ÎÊı:
-  *		UINT16						speed					ËÙ¶È cm/s
-  * Êä³ö²ÎÊı:
-  * ·µ»ØÖµ:
-  *		FLOAT64						acc_basic_resistance	¼õËÙ¶È cm/s^2
-  *************************************************************************/
+* åŠŸèƒ½æè¿°: æ ¹æ®é€Ÿåº¦è®¡ç®—åŸºæœ¬é˜»åŠ›é™„åŠ åŠ é€Ÿåº¦
+* è¾“å…¥å‚æ•°:
+*		UINT16						speed					é€Ÿåº¦ cm/s
+* è¾“å‡ºå‚æ•°:
+* è¿”å›å€¼:
+*		FLOAT64						acc_basic_resistance	å‡é€Ÿåº¦ cm/s^2
+*************************************************************************/
 FLOAT64 GetResistanceAcc(UINT16 speed)
 {
-	FLOAT32 acc_basic_resistance = 0;
-	const TRAIN_PARAMETER* tp = &g_train_param;
-	double kph = 1.0 * speed / 100 * 3.6;
-	UINT16 idx = g_aw_id;
-	FLOAT64 rf = (tp->a[idx] + tp->b[idx] * kph + tp->c[idx] * kph * kph) * 1000.0; // ´÷Î¬Ë¹¹«Ê½½á¹ûÊÇKN, ×ª»¯ÎªN
-	tp = NULL;
-	acc_basic_resistance = (FLOAT32)(rf / CalTrainWeight() * 100);
-	return acc_basic_resistance;
+    FLOAT32 acc_basic_resistance = 0;
+    const TRAIN_PARAMETER* tp = &g_train_param;
+    double kph = 1.0 * speed / 100 * 3.6;
+    UINT16 idx = g_aw_id;
+    FLOAT64 rf = (tp->a[idx] + tp->b[idx] * kph + tp->c[idx] * kph * kph) * 1000.0; // æˆ´ç»´æ–¯å…¬å¼ç»“æœæ˜¯KN, è½¬åŒ–ä¸ºN
+    tp = NULL;
+    acc_basic_resistance = (FLOAT32)(rf / CalTrainWeight() * 100);
+    return acc_basic_resistance;
 }
 
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ¸ù¾İÎ»ÖÃ¼ÆËãÆÂ¶È¸½¼Ó¼ÓËÙ¶È
-  * ÊäÈë²ÎÊı:
-  *		UINT32						dispalcement			Î»ÒÆ cm
-  * Êä³ö²ÎÊı: ÎŞ
-  * ·µ»ØÖµ:
-  *		FLOAT32						gradient_acc			¼ÓËÙ¶È cm/s^2
-  *************************************************************************/
+* åŠŸèƒ½æè¿°: æ ¹æ®ä½ç½®è®¡ç®—å¡åº¦é™„åŠ åŠ é€Ÿåº¦
+* è¾“å…¥å‚æ•°:
+*		UINT32						dispalcement			ä½ç§» cm
+* è¾“å‡ºå‚æ•°: æ— 
+* è¿”å›å€¼:
+*		FLOAT32						gradient_acc			åŠ é€Ÿåº¦ cm/s^2
+*************************************************************************/
 FLOAT32 GetGradientAcc(UINT32 dispalcement)
 {
-	FLOAT32 gradient_acc = 0;/*ÆÂ¶È¸½¼Ó¼ÓËÙ¶È*/
-	UINT16 gradient_front_index, gradient_rear_index;/*Ç°ºóÀëÉ¢ÆÂ¶È¶ÔÓ¦Ë÷Òı*/
-	FLOAT32 gradient_current_index;
-	if (dispalcement<0 || dispalcement>interval_length * 100)/*ÊäÈë²ÎÊı¼ì²é*/
-	{
-		/*Ê²Ã´Ò²²»×ö*/
-	}
-	else
-	{
-		gradient_front_index = dispalcement / 100;
-		gradient_rear_index = gradient_front_index + 1;
-		if ((gradient_front_index > 0 && gradient_front_index < MAX_INTERVAL_SAMPLING)
-			&& (gradient_rear_index > 0 && gradient_rear_index < MAX_INTERVAL_SAMPLING))
-		{
-			gradient_current_index = (FLOAT32)(((FLOAT64)dispalcement - gradient_front_index * 100.0) / 100);
-			gradient_acc = ((gradient[gradient_front_index] + (gradient[gradient_front_index] - gradient[gradient_rear_index]) * gradient_current_index) * GRAVITY_ACC / 10);
-		}
-	}
-	return gradient_acc;
+    FLOAT32 gradient_acc = 0;/*å¡åº¦é™„åŠ åŠ é€Ÿåº¦*/
+    UINT16 gradient_front_index, gradient_rear_index;/*å‰åç¦»æ•£å¡åº¦å¯¹åº”ç´¢å¼•*/
+    FLOAT32 gradient_current_index;
+    if (dispalcement>interval_length * 100)/*è¾“å…¥å‚æ•°æ£€æŸ¥*/
+    {
+        /*ä»€ä¹ˆä¹Ÿä¸åš*/
+    }
+    else
+    {
+        gradient_front_index = dispalcement / discrete_size;
+        gradient_rear_index = gradient_front_index + 1;
+        if ((gradient_front_index > 0 && gradient_front_index < MAX_INTERVAL_SAMPLING)
+            && (gradient_rear_index > 0 && gradient_rear_index < MAX_INTERVAL_SAMPLING))
+        {
+            gradient_current_index = (FLOAT32)(((FLOAT64)dispalcement - gradient_front_index * discrete_size*1.0) / discrete_size);
+            gradient_acc = ((gradient[gradient_front_index] + (gradient[gradient_front_index] - gradient[gradient_rear_index]) * gradient_current_index) * GRAVITY_ACC / 10);
+        }
+    }
+    //printf("%f\n",gradient_acc);
+    return gradient_acc;
 }
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ¸ù¾İÎ»ÖÃ¼ÆËãÇúÏß°ë¾¶¸½¼Ó¼ÓËÙ¶È
-  * ÊäÈë²ÎÊı:
-  *		UINT32						dispalcement			Î»ÒÆ cm
-  * Êä³ö²ÎÊı: ÎŞ
-  * ·µ»ØÖµ:
-  *		FLOAT32						curve_radius_acc		¼ÓËÙ¶È cm/s^2
-  *************************************************************************/
+* åŠŸèƒ½æè¿°: æ ¹æ®ä½ç½®è®¡ç®—æ›²çº¿åŠå¾„é™„åŠ åŠ é€Ÿåº¦
+* è¾“å…¥å‚æ•°:
+*		UINT32						dispalcement			ä½ç§» cm
+* è¾“å‡ºå‚æ•°: æ— 
+* è¿”å›å€¼:
+*		FLOAT32						curve_radius_acc		åŠ é€Ÿåº¦ cm/s^2
+*************************************************************************/
 FLOAT32 GetCurveRadiusAcc(UINT32 dispalcement)
 {
-	FLOAT32 curve_radius_acc = 0;/*ÆÂ¶È¸½¼Ó¼ÓËÙ¶È*/
-	UINT16 curve_radius_index;
-	if (dispalcement<0 || dispalcement>interval_length * 100)/*ÊäÈë²ÎÊı¼ì²é*/
-	{
-		/*Ê²Ã´Ò²²»×ö*/
-	}
-	else
-	{
-		curve_radius_index = dispalcement / 100;
-		if (curve_radius_index > 0 && curve_radius_index < MAX_INTERVAL_SAMPLING && curve_radius[curve_radius_index] != 0)
-			curve_radius_acc = (FLOAT32)(600.0 / curve_radius[curve_radius_index] * GRAVITY_ACC / 10);
-	}
-	return curve_radius_acc;
+    FLOAT32 curve_radius_acc = 0;/*å¡åº¦é™„åŠ åŠ é€Ÿåº¦*/
+    UINT16 curve_radius_index;
+    if (dispalcement>interval_length * 100)/*è¾“å…¥å‚æ•°æ£€æŸ¥*/
+    {
+        /*ä»€ä¹ˆä¹Ÿä¸åš*/
+    }
+    else
+    {
+        curve_radius_index = dispalcement / discrete_size;
+        if (curve_radius_index > 0 && curve_radius_index < MAX_INTERVAL_SAMPLING && curve_radius[curve_radius_index] != 0)
+            curve_radius_acc = (FLOAT32)(600.0 / curve_radius[curve_radius_index] * GRAVITY_ACC / 10);
+    }
+    return curve_radius_acc;
 }
 
 /*************************************************************************
-  * ¹¦ÄÜÃèÊö: ¸ù¾İÁĞ³µµ±Ç°Î»ÖÃ£¬ÉèÖÃÀëÏßÓÅ»¯µÄÉÏÏÂ±ß½ç
-  * ÊäÈë²ÎÊı:
-  * Êä³ö²ÎÊı:
-  *		UINT32*						lower_bound				Ô¼ÊøÏÂ½ç
-  *		UINT32*						upper_bound				Ô¼ÊøÉÏ½ç
-  *		UINT8*						switch_flag				¹¤¿öÇĞ»»±êÊ¶
-  * ·µ»ØÖµ:
-  *		UINT8												½âÎ¬¶È
-  *************************************************************************/
+* åŠŸèƒ½æè¿°: æ ¹æ®åˆ—è½¦å½“å‰ä½ç½®ï¼Œè®¾ç½®ç¦»çº¿ä¼˜åŒ–çš„ä¸Šä¸‹è¾¹ç•Œ
+* è¾“å…¥å‚æ•°:
+* è¾“å‡ºå‚æ•°:
+*		UINT32*						lower_bound				çº¦æŸä¸‹ç•Œ
+*		UINT32*						upper_bound				çº¦æŸä¸Šç•Œ
+*		UINT8*						switch_flag				å·¥å†µåˆ‡æ¢æ ‡è¯†
+* è¿”å›å€¼:
+*		UINT8												è§£ç»´åº¦
+*************************************************************************/
 UINT8 GetBounderOffline(UINT32* lower_bound, UINT32* upper_bound, UINT8* switch_flag)
 {
-	UINT32 station_jump_begin = 0;
-	UINT32 station_jump_end = 0;
-	//Èç¹ûÇø¼ä³¤¶ÈĞ¡ÓÚ2000m£¬²»ĞèÒª¶à½×¶ÎÓÅ»¯
-	if (interval_length < 2000)
-	{
-		lower_bound[0] = 0;
-		upper_bound[0] = interval_length_cm;
-		switch_flag[0] = 1;//Ç£Òı
-		return 1;
-	}
-	//·ñÔò°´ÕÕ¶à½×¶ÎÓÅ»¯
-	else
-	{
-		for (INT32 i = 0; i < limit_num; i++)
-		{
-			if (speed_limit[i] < 1500 && speed_limit_location[i]>50000)//ÕÒµ½Õ¾Ì¨ÏŞËÙµã£¬»®·ÖÌøÍ£Çø¼äÎªÁ½²¿·Ö
-			{
-				station_jump_begin = speed_limit_location[i - 1];
-				station_jump_end = speed_limit_location[i];
-				break;
-			}
-			else
-			{
-				continue;
-			}
-		}
-		lower_bound[0] = 0;
-		upper_bound[0] = station_jump_begin;
-		switch_flag[0] = 1;//Ç£Òı-¶èĞĞ
+    UINT32 station_jump_begin = 0;
+    UINT32 station_jump_end = 0;
+    //å¦‚æœåŒºé—´é•¿åº¦å°äº5000mï¼Œä¸éœ€è¦å¤šé˜¶æ®µä¼˜åŒ–
+    if (interval_length < 5000)
+    {
+        lower_bound[0] = 0;
+        upper_bound[0] = interval_length_cm;
+        switch_flag[0] = 1;//ç‰µå¼•
+        return 1;
+    }
+        //å¦åˆ™æŒ‰ç…§å¤šé˜¶æ®µä¼˜åŒ–
+    else
+    {
+        station_jump_begin=interval_length_cm/4;
+        station_jump_end=station_jump_begin+interval_length_cm/3;
+        lower_bound[0] = 0;
+        upper_bound[0] = station_jump_begin; //å¯¹åŠåˆ†
+        switch_flag[0] = 1;//ç‰µå¼•-æƒ°è¡Œ
 
-		lower_bound[1] = station_jump_end;
-		upper_bound[1] = station_jump_end + (interval_length_cm - station_jump_end) / 3;
-		switch_flag[1] = 2;//¶èĞĞ-Ç£Òı
+        lower_bound[1] = station_jump_begin;
+        upper_bound[1] = station_jump_end;
+        switch_flag[1] = 2;//æƒ°è¡Œ-ç‰µå¼•
 
-		lower_bound[2] = upper_bound[1];
-		upper_bound[2] = interval_length_cm;
-		switch_flag[2] = 1;//Ç£Òı-¶èĞĞ
-		return 3;
-	}
+        lower_bound[2] = station_jump_end;
+        upper_bound[2] = interval_length_cm;
+        switch_flag[2] = 1;//ç‰µå¼•-æƒ°è¡Œ
+        return 3;
+    }
+}
+
+/*************************************************************************
+* åŠŸèƒ½æè¿°: æ ¹æ®
+* è¾“å…¥å‚æ•°:
+* è¾“å‡ºå‚æ•°:
+* è¿”å›å€¼:
+*	UINT8  1ï¼šæ­£å¸¸ 0ï¼šå¼‚å¸¸
+*************************************************************************/
+UINT8 DivideStageByOptimizeSpeed()
+{
+    UINT8 optimize_speed_flag=1;
+    UINT16 traction_num;//ç‰µå¼•å·¥å†µæ•°é‡
+    //å¦‚æœåœ¨çº¿ä¼˜åŒ–è¯¯å·®å¤§äºä¸€å®šé˜ˆå€¼ï¼Œåˆ™åˆ‡æ¢ä¸ºç¦»çº¿ä¼˜åŒ–é€Ÿåº¦
+    if (g_speed_plan_info.optimize_evaluate>5)
+    {
+
+    }
+    else
+    {
+        for(int i=0;i <= dim; i++)
+        {
+            UINT16 level=level_output_flag[i];
+            if(level_output_flag[i]!=1)
+            {
+                //æ‰¾åˆ°å¯åŠ¨ç‰µå¼•é˜¶æ®µç»“æŸç‚¹ï¼Œè®°å½•éœ€è¦ç‰µå¼•çš„æ•°é‡ï¼Œåç»­åˆ’åˆ†ä¸º3ä¸ªå­é˜¶æ®µ
+                traction_num=i;
+                break;
+            }
+        }
+        //ä¸‹è¡Œ
+        if (g_speed_plan_info.current_direction==0)
+        {
+            //å¯åŠ¨ç‰µå¼•é˜¶æ®µåˆ’åˆ†ä¸º3ä¸ªå­é˜¶æ®µ
+            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=traction_num/3*discrete_size/100+g_speed_plan_info.interval_begin_dis;
+            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=speed_curve_offline[traction_num/3];
+            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
+            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
+            g_speed_plan_info.recommend_change_num+=1;
+            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=2*traction_num/3*discrete_size/100+g_speed_plan_info.interval_begin_dis;
+            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=speed_curve_offline[2*traction_num/3];
+            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
+            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
+            g_speed_plan_info.recommend_change_num+=1;
+            //ä¸­é—´é˜¶æ®µæŒ‰ç…§å·¥å†µåˆ‡æ¢ç‚¹å¡«å……
+            UINT16 work_index=1;
+            for (int i = 0; i <= dim; i++)
+            {
+                if(level_output_flag[i]!=work_index)
+                {
+                    g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=i*discrete_size/100+g_speed_plan_info.interval_begin_dis;
+                    g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=speed_curve_offline[i];
+                    g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=level_output_flag[i];
+                    g_speed_plan_info.recommend_change_num+=1;
+                    g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
+                    work_index=level_output_flag[i];
+                }
+            }
+            //åœè½¦ç‚¹æ¨èé€Ÿåº¦ä¸º0ï¼Œæ¨èå·¥å†µæ— æ•ˆ
+            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=interval_length+g_speed_plan_info.interval_begin_dis;
+            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=0;
+            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=5;
+            g_speed_plan_info.recommend_change_num+=1;
+            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=dim;
+        }
+        else
+        {
+            if(g_speed_plan_info.interval_begin_dis<interval_length)
+            {
+                printf("SPEED_PLAN:error!\n");
+                return 0;//æ•°æ®å¼‚å¸¸ç›´æ¥é€€å‡º
+            }
+            //å¯åŠ¨ç‰µå¼•é˜¶æ®µåˆ’åˆ†ä¸º3ä¸ªå­é˜¶æ®µ
+            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-traction_num/3*discrete_size/100;
+            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=speed_curve_offline[traction_num/3];
+            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
+            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
+            g_speed_plan_info.recommend_change_num+=1;
+            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-2*traction_num/3*discrete_size/100;
+            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=speed_curve_offline[2*traction_num/3];
+            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
+            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
+            g_speed_plan_info.recommend_change_num+=1;
+            //ä¸­é—´é˜¶æ®µæŒ‰ç…§å·¥å†µåˆ‡æ¢ç‚¹å¡«å……
+            UINT16 work_index=1;
+            for (int i = 0; i <= dim; i++)
+            {
+                if(level_output_flag[i]!=work_index)
+                {
+                    g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-i*discrete_size/100;
+                    g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=speed_curve_offline[i];
+                    g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=level_output_flag[i];
+                    g_speed_plan_info.recommend_change_num+=1;
+                    g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
+                    work_index=level_output_flag[i];
+                }
+            }
+            //åœè½¦ç‚¹æ¨èé€Ÿåº¦ä¸º0ï¼Œæ¨èå·¥å†µæ— æ•ˆ
+            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-interval_length;
+            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=0;
+            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=5;
+            g_speed_plan_info.recommend_change_num+=1;
+            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=dim;
+        }
+    }
+    return 1;
+}
+
+/*************************************************************************
+* åŠŸèƒ½æè¿°: æ ¹æ®èµ·å§‹ç´¢å¼•å’Œç»“æŸç´¢å¼•è®¡ç®—æ—¶é—´
+* è¾“å…¥å‚æ•°:
+*        UINT16           begin_index      å¼€å§‹ç´¢å¼•
+*        UINT16           end_index        ç»“æŸç´¢å¼•
+*        const UINT16     speed_curve[]    é€Ÿåº¦æ›²çº¿
+*        UINT16           discrete_dis
+* è¾“å‡ºå‚æ•°:
+* è¿”å›å€¼:
+*	     UINT16  å€’è®¡æ—¶
+*************************************************************************/
+UINT16 GetTimeByIndex(UINT16 begin_index,UINT16 end_index,const UINT16 speed_curve[],UINT16 discrete_dis)
+{
+    FLOAT32 time_sum=0;
+    if (begin_index>=end_index)
+    {
+        return 0;
+    }
+    for(int i=begin_index;i<end_index-1;i++)
+    {
+        time_sum+=(FLOAT32)(2.0*discrete_dis/(speed_curve[i]+speed_curve[i+1]));
+    }
+    return (UINT16)time_sum;
+}
+
+
+/*************************************************************************
+* åŠŸèƒ½æè¿°: æ ¹æ®åˆ—è½¦å½“å‰ä½ç½®ï¼ŒæŸ¥è¯¢ä¸‹ä¸€é˜¶æ®µæ¨èé€Ÿåº¦ã€æ¨èå·¥å†µå’Œç”Ÿæ•ˆå€’è®¡æ—¶
+* è¾“å…¥å‚æ•°:
+*        UINT32         distance          å½“å‰å…¬é‡Œæ ‡
+* è¾“å‡ºå‚æ•°:
+*        UINT16          *rec_speed       ä¸‹ä¸€é˜¶æ®µæ¨èé€Ÿåº¦
+*        UINT8           *rec_work         ä¸‹ä¸€é˜¶æ®µæ¨èå·¥å†µ
+*        UINT16          *rec_cutdown     ä¸‹ä¸€é˜¶æ®µç”Ÿæ•ˆå€’è®¡æ—¶
+*        UINT32          *rec_distance    ä¸‹ä¸€é˜¶æ®µç”Ÿæ•ˆè·ç¦»
+* è¿”å›å€¼:
+*		   UINT8  1ï¼šæ­£å¸¸ 0ï¼šå¼‚å¸¸
+*************************************************************************/
+UINT8 GetRecSpdAndWorkByDis(UINT32 distance,UINT16 *rec_speed,UINT8 *rec_work,UINT16 *rec_cutdown,UINT32 *rec_distance)
+{
+    UINT8 result=0;
+    UINT16 current_index;//å½“å‰ä½ç½®ç›¸å¯¹äºä¼˜åŒ–æ›²çº¿ç´¢å¼•
+    //å‚æ•°è¾“å…¥æ ¡éªŒ
+    if((g_direction==0&&(distance<g_speed_plan_info.interval_begin_dis||distance>g_speed_plan_info.interval_end_dis))||
+      (g_direction==1&&(distance>g_speed_plan_info.interval_begin_dis||distance<g_speed_plan_info.interval_end_dis)))
+    {
+        /*è¾“å…¥å‚æ•°å¼‚å¸¸*/
+        return result;
+    }
+
+    /*è®¡ç®—ä¸‹ä¸€é˜¶æ®µæ¨èé€Ÿåº¦å’Œæ¨èå·¥å†µ*/
+    UINT8 next_recommend_index=0;
+    /*å¦‚æœæ˜¯ä¸‹è¡Œ*/
+    if (g_direction==0)
+    {
+        for (int i = 0; i < g_speed_plan_info.recommend_change_num-1; i++)
+        {
+            if (distance < g_speed_plan_info.recommend_distance[0])
+            {
+                *rec_speed = g_speed_plan_info.recommend_speed[0];
+                *rec_work = g_speed_plan_info.recommend_wrok[0];
+                next_recommend_index=0;
+                break;
+            }
+            else if(distance>=g_speed_plan_info.recommend_distance[i]&&distance<g_speed_plan_info.recommend_distance[i+1])
+            {
+                *rec_speed = g_speed_plan_info.recommend_speed[i+1];
+                *rec_work = g_speed_plan_info.recommend_wrok[i+1];
+                next_recommend_index=i+1;
+                break;
+            }
+            else
+            {
+                *rec_speed=0;
+                *rec_work=5;
+                next_recommend_index=0;
+                break;
+            }
+        }
+        /*è®¡ç®—ç”Ÿæ•ˆè·ç¦»*/
+        *rec_distance=(g_speed_plan_info.recommend_distance[next_recommend_index]-distance)>0?(g_speed_plan_info.recommend_distance[next_recommend_index]-distance):0;
+        /*è®¡ç®—ç”Ÿæ•ˆå€’è®¡æ—¶*/
+        current_index=100*distance/discrete_size;
+        *rec_cutdown=GetTimeByIndex(current_index,g_speed_plan_info.recommend_index[next_recommend_index],speed_curve_offline,discrete_size);
+    }
+    /*å¦‚æœæ˜¯ä¸Šè¡Œ*/
+    else
+    {
+        for (int i = 0; i < g_speed_plan_info.recommend_change_num-1; i++)
+        {
+            if (distance > g_speed_plan_info.recommend_distance[0])
+            {
+                *rec_speed = g_speed_plan_info.recommend_speed[0];
+                *rec_work = g_speed_plan_info.recommend_wrok[0];
+                next_recommend_index=0;
+                break;
+            }
+            else if(distance<=g_speed_plan_info.recommend_distance[i]&&distance>g_speed_plan_info.recommend_distance[i+1])
+            {
+                *rec_speed = g_speed_plan_info.recommend_speed[i+1];
+                *rec_work = g_speed_plan_info.recommend_wrok[i+1];
+                next_recommend_index=i+1;
+                break;
+            }
+            else
+            {
+                *rec_speed=0;
+                *rec_work=5;
+                next_recommend_index=0;
+                break;
+            }
+        }
+        /*è®¡ç®—ç”Ÿæ•ˆè·ç¦»*/
+        *rec_distance=(distance-g_speed_plan_info.recommend_distance[next_recommend_index])>0?(distance-g_speed_plan_info.recommend_distance[next_recommend_index]):0;
+        /*è®¡ç®—ç”Ÿæ•ˆå€’è®¡æ—¶*/
+        current_index=100*distance/discrete_size;
+        *rec_cutdown=GetTimeByIndex(current_index,g_speed_plan_info.recommend_index[next_recommend_index],speed_curve_offline,discrete_size);
+
+    }
+
+
+
+
 }
