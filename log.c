@@ -5,6 +5,7 @@ LOGSET logsetting;
 LOG loging;
 
 const static char LogLevelText[4][10]={"INFO","DEBUG","WARN","ERROR"};
+pthread_mutex_t mutex_log=PTHREAD_MUTEX_INITIALIZER;//初始化互斥锁
 
 static char * getdate(char *date);
 
@@ -69,7 +70,7 @@ static LOGSET *getlogset(){
 static char * getdate(char *date){
     //time_t timer=time(NULL);
     //strftime(date,11,"%Y-%m-%d",localtime(&timer));
-    memcpy(date,g_current_time,11);
+    memcpy(date,g_current_time,10);
     return date;
 }
 
@@ -162,7 +163,7 @@ int LogWrite(unsigned char loglevel,char *fromat,...)
     int  rtv = -1;
     va_list args;
 
-    //[为支持多线程需要加锁] pthread_mutex_lock(&mutex_log); //lock.
+    pthread_mutex_lock(&mutex_log);//lock
 
     do{
         //初始化日志
@@ -184,7 +185,7 @@ int LogWrite(unsigned char loglevel,char *fromat,...)
         rtv = 0;
     }while(0);
 
-    //[为支持多线程需要加锁] pthread_mutex_unlock(&mutex_log); //unlock.
+    pthread_mutex_unlock(&mutex_log);//unlock
 
     return rtv;
 }

@@ -106,9 +106,12 @@ void FillTunnelData(char *data,UINT16 row_index,UINT16 column_index)
     {
         case 0:
             g_static_data_csv.tunnel_csv.length+=1;
-            g_static_data_csv.tunnel_csv.distance[row_index] = (UINT32)atoi(data);
+            g_static_data_csv.tunnel_csv.begin_distance[row_index] = (UINT32)atoi(data);
             break;
         case 1:
+            g_static_data_csv.tunnel_csv.end_distance[row_index] = (UINT32)atoi(data);
+            break;
+        case 2:
             g_static_data_csv.tunnel_csv.tunnel_param[row_index] = (UINT16)atoi(data);
             break;
         default:
@@ -461,10 +464,10 @@ int ReadCsvConfig(char *filename)
     {
         for(int j=0;j<columns_temp;j++)
         {
-            char data[10];
+            char data[50];
             fscanf(fp,"%[^,\n]",data);
             fgetc(fp);
-            int debug=atoi(data);
+            //int debug=atoi(data);
             FillCsvData(data,i,j,label_flag_temp);
         }
     }
@@ -686,8 +689,8 @@ FLOAT32 GetEquivalentGradient(UINT32 train_head_loc,UINT32 train_tail_loc)
         //如果列车处于坡度切换点
         if(g_static_data_csv.gradient_csv.distance[i]>train_tail_loc&&g_static_data_csv.gradient_csv.distance[i]<train_head_loc)
         {
-            train_head_gradient=g_static_data_csv.gradient_csv.gradient[i+1];
-            train_tail_gradient=g_static_data_csv.gradient_csv.gradient[i];
+            train_head_gradient=g_static_data_csv.gradient_csv.gradient[i];
+            train_tail_gradient=g_static_data_csv.gradient_csv.gradient[i-1];
             train_head_offset=train_head_loc-g_static_data_csv.gradient_csv.distance[i];
             train_tail_offset=g_static_data_csv.gradient_csv.distance[i]-train_tail_loc;
             equivalent_gradient_temp=(train_head_gradient*(FLOAT32)train_head_offset+train_tail_gradient*(FLOAT32)train_tail_offset)/((FLOAT32)g_train_param.train_length/100);
@@ -695,7 +698,7 @@ FLOAT32 GetEquivalentGradient(UINT32 train_head_loc,UINT32 train_tail_loc)
         }
         else if(train_tail_loc>=g_static_data_csv.gradient_csv.distance[i]&&train_head_loc<=g_static_data_csv.gradient_csv.distance[i+1])
         {
-            equivalent_gradient_temp=g_static_data_csv.gradient_csv.gradient[i+1];
+            equivalent_gradient_temp=g_static_data_csv.gradient_csv.gradient[i];
             return equivalent_gradient_temp;
         }
         else
@@ -740,14 +743,18 @@ UINT16 GetSpeedLimit(UINT32 train_head_loc,UINT32 train_tail_loc)
     }
 
     /*查询列车尾部限速*/
-    for (int i=0;i<g_static_data_csv.speed_limit_csv.length;i++) {
-        if (i != g_static_data_csv.speed_limit_csv.length - 1) {
+    for (int i=0;i<g_static_data_csv.speed_limit_csv.length;i++)
+    {
+        if (i != g_static_data_csv.speed_limit_csv.length - 1)
+        {
             if (train_tail_loc >= g_static_data_csv.speed_limit_csv.distance[i] &&
                 train_tail_loc < g_static_data_csv.speed_limit_csv.distance[i + 1]) {
                 train_tail_limit = g_static_data_csv.speed_limit_csv.speed_limit[i];
                 break;
             }
-        } else {
+        }
+        else
+        {
             train_tail_limit = g_static_data_csv.speed_limit_csv.speed_limit[i];
             break;
         }

@@ -10,6 +10,7 @@
 #include "define.h"
 #include "init.h"
 #include "SpeedPlan.h"
+#include <arpa/inet.h>
 
 #define PORT 8888
 #define MAX_NUM_CLIENT 5
@@ -117,3 +118,19 @@ UINT16 PackPeriodMsgToAPP(UINT8 *send_buffer);
  * 返回值:
  *************************************************************************/
 void SendAPPMessageManage(int client_fd);
+
+/*************************************************************************
+ * 功能描述: 更新发送给APP的周期数据
+ * 输入参数: 无
+ * 输出参数: 无
+ * 返回值: 无
+ *************************************************************************/
+void RefreshPeriodMsgToAPP();
+
+/*************************************************************************
+ * 功能描述: 打包发送给Signal的周期消息
+ * 输入参数: UINT8    *send_buffer      消息存储指针
+ * 输出参数: 无
+ * 返回值:   UINT16   send_buffer_length    消息长度
+ *************************************************************************/
+UINT16 PackPeriodMsgToSignal(UINT8 *send_buffer);

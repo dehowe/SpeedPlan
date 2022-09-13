@@ -17,10 +17,10 @@ typedef double              FLOAT64;
 /*速度规划*/
 #define SAFETY_THRESHOLD_EBI		138				// 推荐速度与EBI的最小差值(5km/h)
 #define GRAVITY_ACC					9.8				// 重力加速度 9.8m/s^2
-#define MAX_SPEED_CURVE				6000			// 优化曲线的最大存储数量
+#define MAX_SPEED_CURVE				1000			// 优化曲线的最大存储数量
 #define MAX_INTERVAL_SAMPLING		6000			// 区间线路数据的最大采样点个数
 #define MAX_LIMIT_POINT				30				// 区间线路限速切换点的最大个数
-#define SPEED_PLAN_TB_RATIO			0.6				// 速度规划牵引制动输出比率
+#define SPEED_PLAN_TB_RATIO			0.8				// 速度规划牵引制动输出比率
 #define MAX_AW_NUM					4				// 列车载荷细分数量（AW0|AW1|AW2|AW3）
 #define MAX_TBCURVE_NUM				200				// 最大的牵引制动特性曲线数量
 #define MAX_STATION_NUM             30              // 最大车站数量
@@ -34,6 +34,10 @@ typedef double              FLOAT64;
 #define MAX_SINGAL_CSV_NUM          100             // 最大信号机数量
 #define MAX_TEMPORARY_LIMIT_NUM     10              // 最大临时限速数量
 #define MAX_OPTIMIZE_CSV_NUM        5000            // 最大离线优化曲线数量
+#define DIRECTION_UP                1               // 上行方向
+#define DIRECTION_DOWN              0               // 下行方向
+#define DEVICE_ID                   1101            // 人机交互设备ID
+
 
 #pragma region 曲线优化所需数据结构体定义
 /*列车参数结构体*/
@@ -87,15 +91,18 @@ typedef struct
 /*曲线优化结构体*/
 typedef struct
 {
+    UINT8 optimize_station;                     /*优化的区间编号*/
     UINT8 optimize_stage;                       /*所处优化阶段  1：正在优化 2：优化完成*/
     UINT16 optimize_evaluate;                   /*优化评价结果 运行时分误差*/
-    UINT8 interval;
-    UINT32 interval_begin_dis;
-    UINT32 interval_end_dis;
+    UINT32 interval;                         /*区间长度 m*/
+    UINT32 interval_begin_dis;               /*区间开始里程*/
+    UINT32 interval_end_dis;                 /*区间结束里程*/
     UINT32 target_time;
     UINT8 aw_id;
     UINT32 current_distance;                 /*列车当前位置*/
+    UINT16 target_speed;                     /*当前优化速度*/
     UINT8 current_direction;                 /*列车当前运行方向*/
+    UINT16 next_station_id;                  /*下一站编号*/
     CHAR next_station_name[20];              /*下一站名称*/
 
     UINT8 recommend_change_num;              /*推荐转换数量*/
@@ -155,7 +162,8 @@ typedef struct
 typedef struct
 {
     UINT16 length;					/*数据个数*/
-    UINT32 distance[MAX_TUNNEL_CSV_NUM];	/*公里标 m*/
+    UINT32 begin_distance[MAX_TUNNEL_CSV_NUM];	/*公里标 m*/
+    UINT32 end_distance[MAX_TUNNEL_CSV_NUM];	/*公里标 m*/
     UINT16 tunnel_param[MAX_TUNNEL_CSV_NUM]; /*参数*/
 }TUNNEL_CSV;
 
@@ -287,10 +295,12 @@ typedef struct
     UINT8 train_plan_flag;       /*列车运行计划变更标志 1:计划变更 0:其他*/
     UINT16 train_ebi;            /*ATP防护速度 km/h*/
     UINT16 train_speed;          /*列车速度 km/h*/
+    UINT16 next_station_id;      /*下一站编号*/
     UINT8 next_staion_name[20];  /*下一站名称*/
     UINT8 next_station_arrive_time[20];  /*下一站到达时间*/
     UINT8 next_station_leave_time[20];   /*下一站出发时间*/
     UINT8 train_work_condition;          /*列车工况 1:牵引 2:巡航 3:惰行 4:制动 5:无效*/
+    UINT8 train_work_level;              /*列车级位 0-100*/
     UINT32 train_distance;               /*列车公里标 m*/
     UINT8 train_time[20];                /*列车时间*/
     UINT16 temporary_limit_num;           /*临时限速数量*/
@@ -347,14 +357,16 @@ typedef struct
     UINT8 optimize_flag;        /*曲线优化标志 1:正在优化 2:优化完成 3:其他*/
     UINT16 train_ebi;           /*ATP防护速度 km/h*/
     UINT16 train_speed;         /*列车速度 km/h*/
-    UINT8 next_staion_name[20]; /*下一站名称*/
+    UINT8 next_station_name[20]; /*下一站名称*/
     UINT8 next_station_arrive_time[20];/*下一站到达时间*/
     UINT8 next_station_leave_time[20]; /*下一站出发时间*/
     UINT8 train_work_condition;        /*列车工况 1:牵引 2:巡航 3:惰行 4:制动 5:无效*/
+    UINT8 train_work_level;            /*列车级位*/
     UINT32 train_distance;             /*列车公里标 m*/
     UINT8 train_time[20];              /*列车时间*/
     UINT16 next_speed_recommend;       /*下一推荐速度 km/h*/
     UINT8 next_work_condition_recommend; /*下一推荐工况 1:牵引 2:巡航 3:惰行 4:制动 5:无效*/
+    UINT8 next_work_level_recommend; /*下一推荐工况 1:牵引 2:巡航 3:惰行 4:制动 5:无效*/
     UINT16 next_recommend_countdown;   /*下一建议生效倒计时 s*/
     UINT32 next_recommend_distance;    /*下一建议生效距离 m*/
     UINT8 temporary_limit_num;         /*临时限速数量*/
