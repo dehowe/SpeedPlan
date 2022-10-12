@@ -41,3 +41,11 @@ UINT32 CalEnergyByMode(UINT16 speed,UINT8 level_flag,UINT8 level_output,UINT32 d
  * 返回值:  UINT32 焦耳
  *************************************************************************/
 UINT32 CalEnergyByUI(UINT32 voltage,UINT32 current,FLOAT32 cycle_time);
+
+/*************************************************************************
+ * 功能描述: 根据车头车尾位置计算限速，两者取最小
+ * 输入参数: 无
+ * 输出参数: 无
+ * 返回值:   FLOAT32   等效坡度 千分之一
+ *************************************************************************/
+UINT16 GetSpeedLimit(UINT32 train_head_loc,UINT32 train_tail_loc);

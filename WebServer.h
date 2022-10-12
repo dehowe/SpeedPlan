@@ -87,6 +87,7 @@ struct WsClient
     void *priv;     //用户私有指针
     Ws_Server *wss; //所在服务器指针
     Ws_Thread *wst; //所在副线程指针
+    int serveFlag;  //服务状态 0：无服务  1：初始化完成 2：周期服务中
 };
 
 //副线程结构体(只要还有一个客户端在维护就不会退出线程)

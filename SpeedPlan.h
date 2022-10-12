@@ -10,9 +10,10 @@ extern UINT16						g_aw_id;							// 载荷
 extern LINE_PARAMETER               g_line_param;                       // 线路参数
 extern STATIC_DATA_CSV              g_static_data_csv;                  // CSV静态数据
 extern SPEED_PLAN_INFO              g_speed_plan_info;                  // 速度规划信息
-extern UINT16                      g_speed_curve_offline[MAX_SPEED_CURVE];  //离线优化速度存储数组
-extern UINT16                      g_level_output_flag[MAX_SPEED_CURVE];    //离线优化级位存储数组
-extern FLOAT32                     g_plan_time[MAX_SPEED_CURVE];            //离线优化运行时分存储数组
+extern UINT16                       g_speed_curve_offline[MAX_SPEED_CURVE];  //离线优化速度存储数组
+extern UINT8                        g_level_flag[MAX_SPEED_CURVE];    //离线优化级位存储数组
+extern UINT8                        g_level_output[MAX_SPEED_CURVE];    //离线优化级位存储数组
+extern FLOAT32                      g_plan_time[MAX_SPEED_CURVE];            //离线优化运行时分存储数组
 /*************************************************************************
 * 功能描述: 速度规划主程序
 * 输入参数: 无
@@ -257,9 +258,10 @@ UINT8 GetRecSpdAndWorkByDis(UINT32 distance,UINT16 *rec_speed,UINT8 *rec_work,UI
 * 输出参数:
 * UINT16                    *target_speed        推荐速度cm/s
 * UINT8                     *level_flag          级位标识 1：牵引 2：惰行 3：制动
+* UINT8                     *level_output        级位值 0-100
 * 返回值:
 *************************************************************************/
-void GetTargetSpeedByDistance(UINT16 *target_speed,UINT8 *level_flag);
+void GetTargetSpeedByDistance(UINT16 *target_speed,UINT8 *level_flag,UINT8 *level_output);
 
 
 

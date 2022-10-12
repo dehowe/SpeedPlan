@@ -311,7 +311,7 @@ void FillOptimizeData(char *data,UINT16 row_index,UINT16 column_index)
             g_static_data_csv.optimize_csv.level_flag_down_aw0[row_index] = (UINT8)atoi(data);
             break;
         case 3:
-            g_static_data_csv.optimize_csv.level_output_down_aw0[row_index] = (UINT16)atoi(data);
+            g_static_data_csv.optimize_csv.level_output_down_aw0[row_index] = (UINT8)atoi(data);
             break;
         case 4:
             g_static_data_csv.optimize_csv.speed_down_aw1[row_index] = (FLOAT32)atof(data);
@@ -320,7 +320,7 @@ void FillOptimizeData(char *data,UINT16 row_index,UINT16 column_index)
             g_static_data_csv.optimize_csv.level_flag_down_aw1[row_index] = (UINT8)atoi(data);
             break;
         case 6:
-            g_static_data_csv.optimize_csv.level_output_down_aw1[row_index] = (UINT16)atoi(data);
+            g_static_data_csv.optimize_csv.level_output_down_aw1[row_index] = (UINT8)atoi(data);
             break;
         case 7:
             g_static_data_csv.optimize_csv.speed_down_aw2[row_index] = (FLOAT32)atof(data);
@@ -329,7 +329,7 @@ void FillOptimizeData(char *data,UINT16 row_index,UINT16 column_index)
             g_static_data_csv.optimize_csv.level_flag_down_aw2[row_index] = (UINT8)atoi(data);
             break;
         case 9:
-            g_static_data_csv.optimize_csv.level_output_down_aw2[row_index] = (UINT16)atoi(data);
+            g_static_data_csv.optimize_csv.level_output_down_aw2[row_index] = (UINT8)atoi(data);
             break;
         case 10:
             g_static_data_csv.optimize_csv.speed_down_aw3[row_index] = (FLOAT32)atof(data);
@@ -338,7 +338,7 @@ void FillOptimizeData(char *data,UINT16 row_index,UINT16 column_index)
             g_static_data_csv.optimize_csv.level_flag_down_aw3[row_index] = (UINT8)atoi(data);
             break;
         case 12:
-            g_static_data_csv.optimize_csv.level_output_down_aw3[row_index] = (UINT16)atoi(data);
+            g_static_data_csv.optimize_csv.level_output_down_aw3[row_index] = (UINT8)atoi(data);
             break;
         case 13:
             g_static_data_csv.optimize_csv.speed_up_aw0[row_index] = (FLOAT32)atof(data);
@@ -347,7 +347,7 @@ void FillOptimizeData(char *data,UINT16 row_index,UINT16 column_index)
             g_static_data_csv.optimize_csv.level_flag_up_aw0[row_index] = (UINT8)atoi(data);
             break;
         case 15:
-            g_static_data_csv.optimize_csv.level_output_up_aw0[row_index] = (UINT16)atoi(data);
+            g_static_data_csv.optimize_csv.level_output_up_aw0[row_index] = (UINT8)atoi(data);
             break;
         case 16:
             g_static_data_csv.optimize_csv.speed_up_aw1[row_index] = (FLOAT32)atof(data);
@@ -356,7 +356,7 @@ void FillOptimizeData(char *data,UINT16 row_index,UINT16 column_index)
             g_static_data_csv.optimize_csv.level_flag_up_aw1[row_index] = (UINT8)atoi(data);
             break;
         case 18:
-            g_static_data_csv.optimize_csv.level_output_up_aw1[row_index] = (UINT16)atoi(data);
+            g_static_data_csv.optimize_csv.level_output_up_aw1[row_index] = (UINT8)atoi(data);
             break;
         case 19:
             g_static_data_csv.optimize_csv.speed_up_aw2[row_index] = (FLOAT32)atof(data);
@@ -365,7 +365,7 @@ void FillOptimizeData(char *data,UINT16 row_index,UINT16 column_index)
             g_static_data_csv.optimize_csv.level_flag_up_aw2[row_index] = (UINT8)atoi(data);
             break;
         case 21:
-            g_static_data_csv.optimize_csv.level_output_up_aw2[row_index] = (UINT16)atoi(data);
+            g_static_data_csv.optimize_csv.level_output_up_aw2[row_index] = (UINT8)atoi(data);
             break;
         case 22:
             g_static_data_csv.optimize_csv.speed_up_aw3[row_index] = (FLOAT32)atof(data);
@@ -374,7 +374,7 @@ void FillOptimizeData(char *data,UINT16 row_index,UINT16 column_index)
             g_static_data_csv.optimize_csv.level_flag_up_aw3[row_index] = (UINT8)atoi(data);
             break;
         case 24:
-            g_static_data_csv.optimize_csv.level_output_up_aw3[row_index] = (UINT16)atoi(data);
+            g_static_data_csv.optimize_csv.level_output_up_aw3[row_index] = (UINT8)atoi(data);
             break;
         default:
             break;
@@ -748,7 +748,8 @@ UINT16 GetSpeedLimit(UINT32 train_head_loc,UINT32 train_tail_loc)
         if (i != g_static_data_csv.speed_limit_csv.length - 1)
         {
             if (train_tail_loc >= g_static_data_csv.speed_limit_csv.distance[i] &&
-                train_tail_loc < g_static_data_csv.speed_limit_csv.distance[i + 1]) {
+                train_tail_loc < g_static_data_csv.speed_limit_csv.distance[i + 1])
+            {
                 train_tail_limit = g_static_data_csv.speed_limit_csv.speed_limit[i];
                 break;
             }
@@ -827,6 +828,7 @@ UINT8 LineStaticDataInit()
         g_line_param.limit[i] = GetSpeedLimit(train_head_loc,train_tail_loc);
         /*曲线半径*/
         g_line_param.curve_radius[i]=GetCurveRadius(train_head_loc);
+        //LogWrite(INFO,"%s:%d:%s:%f","static:limit",g_line_param.limit[i],"gradient",g_line_param.gradient[i]);
     }
     return 1;
 }

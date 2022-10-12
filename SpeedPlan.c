@@ -6,7 +6,8 @@ LINE_PARAMETER              g_line_param;                       // 线路参数 
 STATIC_DATA_CSV             g_static_data_csv;                  // CSV静态数据
 SPEED_PLAN_INFO             g_speed_plan_info;                  // 速度规划信息
 UINT16                      g_speed_curve_offline[MAX_SPEED_CURVE];  //离线优化速度存储数组
-UINT16                      g_level_output_flag[MAX_SPEED_CURVE];    //离线优化级位存储数组
+UINT8                       g_level_flag[MAX_SPEED_CURVE];    //离线优化级位存储数组
+UINT8                       g_level_output[MAX_SPEED_CURVE];    //离线优化级位存储数组
 FLOAT32                     g_plan_time[MAX_SPEED_CURVE];            //离线优化运行时分存储数组
 
 /*速度规划相关变量*/
@@ -51,6 +52,18 @@ void SpeedPlanMain()
         g_speed_plan_info.interval_begin_dis=g_period_msg_from_signal.train_distance;//区间起始位置为列车头部位置
         //memcpy(g_speed_plan_info.next_station_name,g_period_msg_from_signal.next_staion_name,20);
         g_speed_plan_info.next_station_id=g_period_msg_from_signal.next_station_id;//下一站编号
+        //根据当前位置计算一下当前站
+        for(int i=0;i<g_static_data_csv.station_csv.length;i++)
+        {
+            INT32 park_error=(INT32)(g_static_data_csv.station_csv.begin_distance[i])-g_period_msg_from_signal.train_distance;
+            if (abs(park_error)<200)
+            {
+                g_speed_plan_info.current_station_id=g_static_data_csv.station_csv.station_id[i];
+                break;
+            }
+        }
+        //printf("%d-%d\n",g_speed_plan_info.current_station_id,g_speed_plan_info.next_station_id);
+
         for(int i=0;i<g_static_data_csv.station_csv.length;i++)
         {
             //if(strcmp(g_static_data_csv.station_csv.station_name[i],g_speed_plan_info.next_station_name)==0)
@@ -147,12 +160,7 @@ void *SpeedPlanOffline()
     dim = GetOptimalSpeedOffline(speed_curve_offline, discrete_size, speed_limit_max, speed_limit_min, speed_limit_mmax,
                                  interval_length_cm, speed_limit_location, speed_limit, limit_num, target_time_offline, solution_num);
     //sleep(10);//模拟板卡求解时间
-    for (int i = 0; i <= dim; i++)
-    {
-        g_speed_curve_offline[i]=speed_curve_offline[i];
-        g_level_output_flag[i]=level_output_flag[i];
-        g_plan_time[i]=plan_time[i];
-    }
+
 
     DivideStageByOptimizeSpeed();
     g_speed_plan_info.optimize_stage=2;
@@ -233,16 +241,13 @@ UINT8 GetBaseDataReady()
                         {
                             speed_limit_location[k] = (i - 1) * line_param_temp->discrete_size*100-g_speed_plan_info.interval_begin_dis*100;
                         }
-                        speed_limit[k] = speed_limit_last;
+                        speed_limit[k] = speed_limit_last-SAFETY_THRESHOLD_EBI;
                         /*更新上一限速*/
                         speed_limit_last = line_param_temp->limit[i];
                         k += 1;
                     }
-                    else
-                    {
-                        continue;
-                    }
                 }
+                //LogWrite(INFO,"%s:%d","limit",line_param_temp->limit[i]);
             }
             speed_limit_location[k] = g_speed_plan_info.interval_end_dis*100-g_speed_plan_info.interval_begin_dis*100;
             speed_limit[k] = line_param_temp->limit[g_speed_plan_info.interval_end_dis/line_param_temp->discrete_size - 1];
@@ -304,11 +309,8 @@ UINT8 GetBaseDataReady()
                         speed_limit_last = line_param_temp->limit[i];
                         k += 1;
                     }
-                    else
-                    {
-                        continue;
-                    }
                 }
+                //LogWrite(INFO,"%s:%d:%d","limit",line_param_temp->limit[i],i);
             }
             speed_limit_location[k] = g_speed_plan_info.interval_begin_dis*100-g_speed_plan_info.interval_end_dis*100;
             speed_limit[k] = line_param_temp->limit[g_speed_plan_info.interval_end_dis/line_param_temp->discrete_size];
@@ -1083,10 +1085,11 @@ UINT8 GetBounderOffline(UINT32* lower_bound, UINT32* upper_bound, UINT8* switch_
 * 返回值:
 *	    UINT16     离线优化速度数量
 *************************************************************************/
-void GetOptimizeSpeedIndex(UINT32 *distance,UINT16 *optimize_speed,UINT8 *level,UINT16 *length)
+void GetOptimizeSpeedIndex(UINT32 *distance,UINT16 *optimize_speed,UINT8 *level,UINT8 *level_output,UINT16 *length)
 {
     FLOAT32 *speed_temp=NULL;  //离线优化速度临时指针
     UINT8 *work_temp=NULL;    //离线优化工况临时指针
+    UINT8 *work_output_temp=NULL;    //离线优化工况级位临时指针
     //根据运行方向、载荷找到相应离线优化速度和工况
     if(g_speed_plan_info.current_direction==DIRECTION_DOWN)
     {
@@ -1096,21 +1099,25 @@ void GetOptimizeSpeedIndex(UINT32 *distance,UINT16 *optimize_speed,UINT8 *level,
             case 0:
                 speed_temp=g_static_data_csv.optimize_csv.speed_down_aw0;
                 work_temp=g_static_data_csv.optimize_csv.level_flag_down_aw0;
+                work_output_temp=g_static_data_csv.optimize_csv.level_output_down_aw0;
                 break;
             //AW1
             case 1:
                 speed_temp=g_static_data_csv.optimize_csv.speed_down_aw1;
                 work_temp=g_static_data_csv.optimize_csv.level_flag_down_aw1;
+                work_output_temp=g_static_data_csv.optimize_csv.level_output_down_aw1;
                 break;
             //AW2
             case 2:
                 speed_temp=g_static_data_csv.optimize_csv.speed_down_aw2;
                 work_temp=g_static_data_csv.optimize_csv.level_flag_down_aw2;
+                work_output_temp=g_static_data_csv.optimize_csv.level_output_down_aw2;
                 break;
             //AW3
             case 3:
                 speed_temp=g_static_data_csv.optimize_csv.speed_down_aw3;
                 work_temp=g_static_data_csv.optimize_csv.level_flag_down_aw3;
+                work_output_temp=g_static_data_csv.optimize_csv.level_output_down_aw3;
                 break;
             default:
                 break;
@@ -1123,18 +1130,22 @@ void GetOptimizeSpeedIndex(UINT32 *distance,UINT16 *optimize_speed,UINT8 *level,
             case 0:
                 speed_temp=g_static_data_csv.optimize_csv.speed_up_aw0;
                 work_temp=g_static_data_csv.optimize_csv.level_flag_up_aw0;
+                work_output_temp=g_static_data_csv.optimize_csv.level_output_up_aw0;
                 break;
             case 1:
                 speed_temp=g_static_data_csv.optimize_csv.speed_up_aw1;
                 work_temp=g_static_data_csv.optimize_csv.level_flag_up_aw1;
+                work_output_temp=g_static_data_csv.optimize_csv.level_output_up_aw1;
                 break;
             case 2:
                 speed_temp=g_static_data_csv.optimize_csv.speed_up_aw2;
                 work_temp=g_static_data_csv.optimize_csv.level_flag_up_aw2;
+                work_output_temp=g_static_data_csv.optimize_csv.level_output_up_aw2;
                 break;
             case 3:
                 speed_temp=g_static_data_csv.optimize_csv.speed_up_aw3;
                 work_temp=g_static_data_csv.optimize_csv.level_flag_up_aw3;
+                work_output_temp=g_static_data_csv.optimize_csv.level_output_up_aw3;
                 break;
             default:
                 break;
@@ -1152,8 +1163,9 @@ void GetOptimizeSpeedIndex(UINT32 *distance,UINT16 *optimize_speed,UINT8 *level,
                 if (g_static_data_csv.optimize_csv.distance[i] >= g_speed_plan_info.interval_begin_dis &&
                     g_static_data_csv.optimize_csv.distance[i] <= g_speed_plan_info.interval_end_dis) {
                     distance[optimize_num] = g_static_data_csv.optimize_csv.distance[i];
-                    optimize_speed[optimize_num] = (UINT16) (speed_temp[i] * 1000 / 36);
+                    optimize_speed[optimize_num] = (UINT16) (speed_temp[i] * 100);
                     level[optimize_num] = work_temp[i];
+                    level_output[optimize_num] = work_output_temp[i];
                     optimize_num += 1;
                 }
 
@@ -1168,8 +1180,9 @@ void GetOptimizeSpeedIndex(UINT32 *distance,UINT16 *optimize_speed,UINT8 *level,
                     g_static_data_csv.optimize_csv.distance[i] >= g_speed_plan_info.interval_end_dis)
                 {
                     distance[optimize_num] = g_static_data_csv.optimize_csv.distance[i];
-                    optimize_speed[optimize_num] = (UINT16) (speed_temp[i] * 1000 / 36);
+                    optimize_speed[optimize_num] = (UINT16) (speed_temp[i] * 100);
                     level[optimize_num] = work_temp[i];
+                    level_output[optimize_num] = work_output_temp[i];
                     optimize_num += 1;
                 }
             }
@@ -1194,180 +1207,140 @@ UINT8 DivideStageByOptimizeSpeed()
     UINT16 traction_num;//牵引工况数量
     g_speed_plan_info.recommend_change_num=0;
     //如果在线优化误差大于一定阈值，则切换为离线优化速度
-    if (g_speed_plan_info.optimize_evaluate>500)
+    if (g_speed_plan_info.optimize_evaluate>15)
     {
+        g_speed_plan_info.optimize_mode=2;
+        printf("%s SPEED_PLAN:online optimize result cannot meet the requirements,use offline data!\n",g_current_time);
         UINT32 optimize_distance[500];
         UINT16 optimize_speed[500];
         UINT8 optimize_work[500];
+        UINT8 optimize_work_output[500];
         UINT16 optimize_num=0;
-        GetOptimizeSpeedIndex(optimize_distance,optimize_speed,optimize_work,&optimize_num);
-        for(int i=0;i <= optimize_num; i++)
+        //根据载荷和当前里程填充优化数据
+        GetOptimizeSpeedIndex(optimize_distance,optimize_speed,optimize_work,optimize_work_output,&optimize_num);
+        //更新该区间离线优化速度、工况级位、工况输出
+        dim=optimize_num-1;
+        for(int i=0;i<=dim;i++)
         {
-            UINT16 level=optimize_work[i];
-            if(optimize_work[i]!=1)
+            //此逻辑主要解决列车停车欠标，查询到离线优化速度为0时的特殊处理
+            if(i<10&&optimize_speed[i]==0)
             {
-                //找到启动牵引阶段结束点，记录需要牵引的数量，后续划分为3个子阶段
-                traction_num=i;
-                break;
+                optimize_speed[i]=optimize_speed[i+1];
             }
+            //更新全局优化速度
+            g_speed_curve_offline[i]=optimize_speed[i];
+            g_level_flag[i]=optimize_work[i];
+            g_level_output[i]=optimize_work_output[i];
+            printf("target:%d\n", g_speed_curve_offline[i]);
         }
-        //下行
-        if (g_speed_plan_info.current_direction==DIRECTION_DOWN)
-        {
-            //启动牵引阶段划分为3个子阶段
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=optimize_distance[traction_num/3];
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=optimize_speed[traction_num/3];
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
-            g_speed_plan_info.recommend_change_num+=1;
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=optimize_distance[2*traction_num/3];
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=optimize_speed[2*traction_num/3];
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
-            g_speed_plan_info.recommend_change_num+=1;
-            //中间阶段按照工况切换点填充
-            UINT16 work_index=1;
-            for (int i = 0; i < optimize_num; i++)
-            {
-                if(optimize_work[i]!=work_index)
-                {
-                    g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=optimize_distance[i];
-                    g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=optimize_speed[i];
-                    g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=optimize_work[i];
-                    g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
-                    g_speed_plan_info.recommend_change_num+=1;
-                    work_index=optimize_work[i];
-                }
-            }
-            //停车点推荐速度为0，推荐工况无效
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=optimize_distance[optimize_num-1];
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=0;
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=5;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=optimize_num-1;
-            g_speed_plan_info.recommend_change_num+=1;
-        }
-        else
-        {
-            //启动牵引阶段划分为3个子阶段
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=optimize_distance[traction_num/3];
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=optimize_speed[traction_num/3];
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
-            g_speed_plan_info.recommend_change_num+=1;
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=optimize_distance[2*traction_num/3];
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=optimize_speed[2*traction_num/3];
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
-            g_speed_plan_info.recommend_change_num+=1;
-            //中间阶段按照工况切换点填充
-            UINT16 work_index=1;
-            for (int i = 0; i < optimize_num; i++)
-            {
-                if(optimize_work[i]!=work_index)
-                {
-                    g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=optimize_distance[i];
-                    g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=optimize_speed[i];
-                    g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=optimize_work[i];
-                    g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
-                    g_speed_plan_info.recommend_change_num+=1;
-                    work_index=optimize_work[i];
-                }
-            }
-            //停车点推荐速度为0，推荐工况无效
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=optimize_distance[optimize_num-1];
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=0;
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=5;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=optimize_num-1;
-            g_speed_plan_info.recommend_change_num+=1;
-        }
+
     }
     else
     {
-        for(int i=0;i <= dim; i++)
+        g_speed_plan_info.optimize_mode=1;//采用在线优化数据
+        for (int i = 0; i <= dim; i++)
         {
-            UINT16 level=g_level_output_flag[i];
-            if(g_level_output_flag[i]!=1)
+            g_speed_curve_offline[i]=speed_curve_offline[i];
+            g_level_flag[i]=level_output_flag[i];
+            //根据级位计算级位值，在线优化采用的固定级位比率优化
+            if (g_level_flag[i]==1||g_level_flag[i]==3)
             {
-                //找到启动牵引阶段结束点，记录需要牵引的数量，后续划分为3个子阶段
-                traction_num=i;
-                break;
+                g_level_output[i]=SPEED_PLAN_TB_RATIO*100;
             }
-        }
-        //下行
-        if (g_speed_plan_info.current_direction==DIRECTION_DOWN)
-        {
-            //启动牵引阶段划分为3个子阶段
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=traction_num/3*discrete_size/100+g_speed_plan_info.interval_begin_dis;
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[traction_num/3];
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
-            g_speed_plan_info.recommend_change_num+=1;
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=2*traction_num/3*discrete_size/100+g_speed_plan_info.interval_begin_dis;
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[2*traction_num/3];
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
-            g_speed_plan_info.recommend_change_num+=1;
-            //中间阶段按照工况切换点填充
-            UINT16 work_index=1;
-            for (int i = 0; i <= dim; i++)
+            else
             {
-                if(g_level_output_flag[i]!=work_index)
-                {
-                    g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=i*discrete_size/100+g_speed_plan_info.interval_begin_dis;
-                    g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[i];
-                    g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=g_level_output_flag[i];
-                    g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
-                    g_speed_plan_info.recommend_change_num+=1;
-                    work_index=g_level_output_flag[i];
-                }
+                g_level_output[i]=0;
             }
-            //停车点推荐速度为0，推荐工况无效
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=interval_length+g_speed_plan_info.interval_begin_dis;
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=0;
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=5;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=dim;
-            g_speed_plan_info.recommend_change_num+=1;
-        }
-        else
-        {
-            if(g_speed_plan_info.interval_begin_dis<interval_length)
-            {
-                printf("SPEED_PLAN:error!\n");
-                return 0;//数据异常直接退出
-            }
-            //启动牵引阶段划分为3个子阶段
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-traction_num/3*discrete_size/100;
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[traction_num/3];
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
-            g_speed_plan_info.recommend_change_num+=1;
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-2*traction_num/3*discrete_size/100;
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[2*traction_num/3];
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
-            g_speed_plan_info.recommend_change_num+=1;
-            //中间阶段按照工况切换点填充
-            UINT16 work_index=1;
-            for (int i = 0; i <= dim; i++)
-            {
-                if(g_level_output_flag[i]!=work_index)
-                {
-                    g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-i*discrete_size/100;
-                    g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[i];
-                    g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=g_level_output_flag[i];
-                    g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
-                    g_speed_plan_info.recommend_change_num+=1;
-                    work_index=g_level_output_flag[i];
-                }
-            }
-            //停车点推荐速度为0，推荐工况无效
-            g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-interval_length;
-            g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=0;
-            g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=5;
-            g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=dim;
-            g_speed_plan_info.recommend_change_num+=1;
+            g_plan_time[i]=plan_time[i];
         }
     }
+    //根据优化工况划分阶段，牵引阶段划分为3个阶段
+    for(int i=0;i <= dim; i++)
+    {
+        UINT16 level=g_level_flag[i];
+        if(g_level_flag[i]!=1)
+        {
+            //找到启动牵引阶段结束点，记录需要牵引的数量，后续划分为3个子阶段
+            traction_num=i;
+            break;
+        }
+    }
+    //下行
+    if (g_speed_plan_info.current_direction==DIRECTION_DOWN)
+    {
+        //启动牵引阶段划分为3个子阶段
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=traction_num/3*discrete_size/100+g_speed_plan_info.interval_begin_dis;
+        g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[traction_num/3];
+        g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
+        g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
+        g_speed_plan_info.recommend_change_num+=1;
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=2*traction_num/3*discrete_size/100+g_speed_plan_info.interval_begin_dis;
+        g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[2*traction_num/3];
+        g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
+        g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
+        g_speed_plan_info.recommend_change_num+=1;
+        //中间阶段按照工况切换点填充
+        UINT16 work_index=1;
+        for (int i = 0; i <= dim; i++)
+        {
+            if(g_level_flag[i]!=work_index)
+            {
+                g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=i*discrete_size/100+g_speed_plan_info.interval_begin_dis;
+                g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[i];
+                g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=g_level_flag[i];
+                g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
+                g_speed_plan_info.recommend_change_num+=1;
+                work_index=g_level_flag[i];
+            }
+        }
+        //停车点推荐速度为0，推荐工况无效
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=interval_length+g_speed_plan_info.interval_begin_dis;
+        g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=0;
+        g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=5;
+        g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=dim;
+        g_speed_plan_info.recommend_change_num+=1;
+    }
+    else
+    {
+        if(g_speed_plan_info.interval_begin_dis<interval_length)
+        {
+            printf("SPEED_PLAN:error!\n");
+            return 0;//数据异常直接退出
+        }
+        //启动牵引阶段划分为3个子阶段
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-traction_num/3*discrete_size/100;
+        g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[traction_num/3];
+        g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
+        g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
+        g_speed_plan_info.recommend_change_num+=1;
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-2*traction_num/3*discrete_size/100;
+        g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[2*traction_num/3];
+        g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
+        g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
+        g_speed_plan_info.recommend_change_num+=1;
+        //中间阶段按照工况切换点填充
+        UINT16 work_index=1;
+        for (int i = 0; i <= dim; i++)
+        {
+            if(g_level_flag[i]!=work_index)
+            {
+                g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-i*discrete_size/100;
+                g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[i];
+                g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=g_level_flag[i];
+                g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
+                g_speed_plan_info.recommend_change_num+=1;
+                work_index=g_level_flag[i];
+            }
+        }
+        //停车点推荐速度为0，推荐工况无效
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-interval_length;
+        g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=0;
+        g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=5;
+        g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=dim;
+        g_speed_plan_info.recommend_change_num+=1;
+    }
+
+
 //    for (int i = 0; i < g_speed_plan_info.recommend_change_num; i++)
 //    {
 //        printf("%d,%d,%d,%d,%d\n",i,g_speed_plan_info.recommend_distance[i],g_speed_plan_info.recommend_speed[i],
@@ -1402,7 +1375,7 @@ UINT16 GetTimeByIndex(UINT16 begin_index,UINT16 end_index,const UINT16 speed_cur
         }
         else
         {
-            printf("cal time error!");
+            printf("%s SPEED_PLAN:cal time error!\n",g_current_time);
         }
     }
     return (UINT16)time_sum;
@@ -1527,14 +1500,15 @@ UINT8 GetRecSpdAndWorkByDis(UINT32 distance,UINT16 *rec_speed,UINT8 *rec_work,UI
 * 输出参数:
 * UINT16                    *target_speed        推荐速度cm/s
 * UINT8                     *level_flag          级位标识 1：牵引 2：惰行 3：制动
+* UINT8                     *level_output        级位值 0-100
 * 返回值:
 *************************************************************************/
-void GetTargetSpeedByDistance(UINT16 *target_speed,UINT8 *level_flag)
+void GetTargetSpeedByDistance(UINT16 *target_speed,UINT8 *level_flag,UINT8 *level_output)
 {
     int i;
     UINT32 distance_temp;
     //下行
-    if (g_speed_plan_info.current_direction==0)
+    if (g_speed_plan_info.current_direction==DIRECTION_DOWN)
     {
         if(g_period_msg_from_signal.train_distance>g_speed_plan_info.interval_begin_dis)
         {
@@ -1567,12 +1541,14 @@ void GetTargetSpeedByDistance(UINT16 *target_speed,UINT8 *level_flag)
                 if (i!=0)
                 {
                     *target_speed=(UINT16)(1.0*g_speed_curve_offline[i]+1.0*(distance_temp-discrete_size*i)*(g_speed_curve_offline[i+1]-g_speed_curve_offline[i])/discrete_size);
-                    *level_flag=g_level_output_flag[i];
+                    *level_flag=g_level_flag[i];
+                    *level_output=g_level_output[i];
                 }
                 else
                 {
                     *target_speed=g_speed_curve_offline[1];
-                    *level_flag=g_level_output_flag[1];
+                    *level_flag=g_level_flag[1];
+                    *level_output=g_level_output[i];
                 }
                 break;
             }
@@ -1581,12 +1557,15 @@ void GetTargetSpeedByDistance(UINT16 *target_speed,UINT8 *level_flag)
         {
             *target_speed=0;
             *level_flag=3;
+            *level_output=0;
         }
     }
     else
     {
         *target_speed=0;
         *level_flag=3;
+        *level_output=0;
     }
 
 }
+

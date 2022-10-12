@@ -11,6 +11,7 @@
 #include "init.h"
 #include "SpeedPlan.h"
 #include <arpa/inet.h>
+#include "init.h"
 
 #define PORT 8888
 #define MAX_NUM_CLIENT 5

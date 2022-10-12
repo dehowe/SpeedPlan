@@ -505,6 +505,9 @@ void onExit(Ws_Client *wsc, Ws_ExitType exitType)
 void *WebSocketServer()
 {
     int i;
+    UINT8 result;
+    UINT16 length=0;
+    char send_buff[1024*10];
     //服务器必须参数
     Ws_Server *wss = ws_server_create(
             9999,       //服务器端口
@@ -517,12 +520,21 @@ void *WebSocketServer()
     //服务器启动至少先等3秒(有时会bind超时)
     while (!wss->isExit)
     {
-        ws_delayms(3000);
-        //每3秒推送信息给所有客户端
+        //200ms周期
+        ws_delayms(200);
+        //打包数据
+        length=PackPeriodJsonDataToApp(send_buff);
+        //每200ms推送信息给所有客户端
         for (i = 0; i < WS_SERVER_CLIENT; i++)
         {
-            if (wss->client[i].fd && wss->client[i].isLogin && !wss->client[i].exitType)
+            if (wss->client[i].fd && wss->client[i].isLogin && !wss->client[i].exitType&&wss->client[i].serveFlag==2)
             {
+                result = ws_send(wss->client[i].fd, send_buff, length, false, WDT_TXTDATA);
+                //发送失败,标记异常(后续会被自动回收)
+                if (result < 0)
+                    wss->client[i].exitType = WET_SEND;
+                //printf("%s send msg 203 to %d\n",g_current_time,wss->client[i].fd);
+
 
 //                snprintf(buff, sizeof(buff), "Tips from server fd/%03d index/%03d total/%03d %s",
 //                         wss->client[i].fd, wss->client[i].index, wss->clientCount, ws_time());
@@ -675,6 +687,8 @@ UINT16 PackInitJsonDataToApp(char* json_data)
         cJSON_AddStringToObject(pItem,"name",temp);
         sprintf(temp,"%d",g_static_data_csv.station_csv.begin_distance[i]);
         cJSON_AddStringToObject(pItem,"distance",temp);
+        sprintf(temp,"%d",g_static_data_csv.station_csv.station_id[i]);
+        cJSON_AddStringToObject(pItem,"station_id",temp);
         cJSON_AddItemToArray(pArray,pItem);
     }
     cJSON_AddStringToObject(pRoot,"serve_flag","1");
@@ -741,6 +755,12 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     //实时速度
     sprintf(temp,"%d",g_period_msg_to_app.train_speed);
     cJSON_AddStringToObject(pRoot,"speed",temp);
+    //当前站ID
+    sprintf(temp,"%d",g_speed_plan_info.current_station_id);
+    cJSON_AddStringToObject(pRoot,"current_station_id",temp);
+    //下一站ID
+    sprintf(temp,"%d",g_speed_plan_info.next_station_id);
+    cJSON_AddStringToObject(pRoot,"next_station_id",temp);
     //列车计划到达下一车站名称
     sprintf(temp,"%s",g_period_msg_to_app.next_station_name);
     //printf("test:%s\n",temp);
@@ -800,7 +820,6 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     length= strlen(szJSON);
     return length;
 }
-UINT8 app_serve_flag=0;//app服务状态 0：无服务  1：初始化完成 2：周期服务中
 
 /*************************************************************************
  * 功能描述: 200msAPPJSON数据发送线程
@@ -814,7 +833,7 @@ void *SendPeriodJsonDataToApp(void *arg)
     UINT16 length=0;
     char send_buff[1024*10];
     Ws_Client *wsc=arg;
-    while (app_serve_flag==2&&wsc->fd && wsc->isLogin && !wsc->exitType)
+    while (wsc->serveFlag==2&&wsc->fd && wsc->isLogin && !wsc->exitType)
     {
         length=PackPeriodJsonDataToApp(send_buff);
         result = ws_send(wsc->fd, send_buff, length, false, WDT_TXTDATA);
@@ -824,8 +843,30 @@ void *SendPeriodJsonDataToApp(void *arg)
         //printf("%s WEB SOCKET:send message 204 to APP success!\n",g_current_time);
         usleep(200000);
     }
-    app_serve_flag=1;
+    wsc->serveFlag=1;
     pthread_exit(0);//此线程退出
+}
+
+UINT16 DEVICE_ID[4]={1101,1102,1103,1104};// 人机交互设备ID
+UINT8 DEVICE_NUM=4;
+/*************************************************************************
+ * 功能描述: 检验输入设备ID的有效性
+ * 输入参数:   UINT16 device_id 设备ID
+ * 输出参数:
+ * 返回值:  1：设备有效 0：无效
+ *************************************************************************/
+UINT8 GetDeviceValid(UINT32 device_id)
+{
+    UINT8 find_result=0;
+    for (int i = 0; i < DEVICE_NUM;i++)
+    {
+        if(device_id==DEVICE_ID[i])
+        {
+            find_result=1;
+            break;
+        }
+    }
+    return find_result;
 }
 
 
@@ -849,14 +890,15 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
     message_id= (UINT16)cJSON_GetObjectItem(pRoot,"msg_type")->valueint;
     device_id= (UINT32)cJSON_GetObjectItem(pRoot,"device_id")->valueint;
     serve_flag= (UINT8)cJSON_GetObjectItem(pRoot,"serve_flag")->valueint;
-    if (DEVICE_ID==device_id)
+    result=GetDeviceValid(device_id);//判断此设备是否登记
+    if (1==result)
     {
         switch (message_id)
         {
             case 103:
                 if(serve_flag==1)
                 {
-                    app_serve_flag=1;
+                    wsc->serveFlag=1;
                     length=PackInitJsonDataToApp(send_buff);
                     result = ws_send(wsc->fd, send_buff, length, false, WDT_TXTDATA);
                     //发送失败,标记异常(后续会被自动回收)
@@ -867,7 +909,7 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                 }
                 else if (serve_flag==2)
                 {
-                    app_serve_flag=0;
+                    wsc->serveFlag=0;
                     length=PackSuccessJsonDataToApp(send_buff);
                     result = ws_send(wsc->fd, send_buff, length ,false, WDT_TXTDATA);
                     //发送失败,标记异常(后续会被自动回收)
@@ -888,15 +930,15 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                 }
                 break;
             case 104:
-                if(serve_flag==1&&app_serve_flag==1)
+                if(serve_flag==1&&wsc->serveFlag==1)
                 {
-                    app_serve_flag=2;
+                    wsc->serveFlag=2;
                     /*创建通信管理线程*/
-                    pthread_t tid_app;
-                    if(pthread_create(&tid_app,NULL,SendPeriodJsonDataToApp,wsc))
-                    {
-                        perror("Fail to create server thread");
-                    }
+//                    pthread_t tid_app;
+//                    if(pthread_create(&tid_app,NULL,SendPeriodJsonDataToApp,wsc))
+//                    {
+//                        perror("Fail to create server thread");
+//                    }
                 }
                 else
                 {

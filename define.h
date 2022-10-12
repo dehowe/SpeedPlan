@@ -36,7 +36,6 @@ typedef double              FLOAT64;
 #define MAX_OPTIMIZE_CSV_NUM        5000            // 最大离线优化曲线数量
 #define DIRECTION_UP                1               // 上行方向
 #define DIRECTION_DOWN              0               // 下行方向
-#define DEVICE_ID                   1101            // 人机交互设备ID
 
 
 #pragma region 曲线优化所需数据结构体定义
@@ -94,6 +93,7 @@ typedef struct
     UINT8 optimize_station;                     /*优化的区间编号*/
     UINT8 optimize_stage;                       /*所处优化阶段  1：正在优化 2：优化完成*/
     UINT16 optimize_evaluate;                   /*优化评价结果 运行时分误差*/
+    UINT8 optimize_mode;                     /*优化模式 1：在线优化曲线 2：使用离线优化数据*/
     UINT32 interval;                         /*区间长度 m*/
     UINT32 interval_begin_dis;               /*区间开始里程*/
     UINT32 interval_end_dis;                 /*区间结束里程*/
@@ -102,6 +102,7 @@ typedef struct
     UINT32 current_distance;                 /*列车当前位置*/
     UINT16 target_speed;                     /*当前优化速度*/
     UINT8 current_direction;                 /*列车当前运行方向*/
+    UINT16 current_station_id;               /*当前站编号*/
     UINT16 next_station_id;                  /*下一站编号*/
     CHAR next_station_name[20];              /*下一站名称*/
 
@@ -225,28 +226,28 @@ typedef struct
     UINT32 distance[MAX_OPTIMIZE_CSV_NUM];	/*公里标 m*/
     FLOAT32 speed_down_aw0[MAX_OPTIMIZE_CSV_NUM];           /*优化速度 下行 aw0*/
     UINT8 level_flag_down_aw0[MAX_OPTIMIZE_CSV_NUM];        /*优化级位标识 下行 aw0*/
-    UINT16 level_output_down_aw0[MAX_OPTIMIZE_CSV_NUM];     /*优化级位输出 下行 aw0*/
+    UINT8 level_output_down_aw0[MAX_OPTIMIZE_CSV_NUM];     /*优化级位输出 下行 aw0*/
     FLOAT32 speed_down_aw1[MAX_OPTIMIZE_CSV_NUM];           /*优化速度 下行 aw1*/
     UINT8 level_flag_down_aw1[MAX_OPTIMIZE_CSV_NUM];        /*优化级位标识 下行 aw1*/
-    UINT16 level_output_down_aw1[MAX_OPTIMIZE_CSV_NUM];     /*优化级位输出 下行 aw1*/
+    UINT8 level_output_down_aw1[MAX_OPTIMIZE_CSV_NUM];     /*优化级位输出 下行 aw1*/
     FLOAT32 speed_down_aw2[MAX_OPTIMIZE_CSV_NUM];           /*优化速度 下行 aw2*/
     UINT8 level_flag_down_aw2[MAX_OPTIMIZE_CSV_NUM];        /*优化级位标识 下行 aw2*/
-    UINT16 level_output_down_aw2[MAX_OPTIMIZE_CSV_NUM];     /*优化级位输出 下行 aw2*/
+    UINT8 level_output_down_aw2[MAX_OPTIMIZE_CSV_NUM];     /*优化级位输出 下行 aw2*/
     FLOAT32 speed_down_aw3[MAX_OPTIMIZE_CSV_NUM];           /*优化速度 下行 aw3*/
     UINT8 level_flag_down_aw3[MAX_OPTIMIZE_CSV_NUM];        /*优化级位标识 下行 aw3*/
-    UINT16 level_output_down_aw3[MAX_OPTIMIZE_CSV_NUM];     /*优化级位输出 下行 aw3*/
+    UINT8 level_output_down_aw3[MAX_OPTIMIZE_CSV_NUM];     /*优化级位输出 下行 aw3*/
     FLOAT32 speed_up_aw0[MAX_OPTIMIZE_CSV_NUM];             /*优化速度 上行 aw0*/
     UINT8 level_flag_up_aw0[MAX_OPTIMIZE_CSV_NUM];          /*优化级位标识 上行 aw0*/
-    UINT16 level_output_up_aw0[MAX_OPTIMIZE_CSV_NUM];       /*优化级位输出 上行 aw0*/
+    UINT8 level_output_up_aw0[MAX_OPTIMIZE_CSV_NUM];       /*优化级位输出 上行 aw0*/
     FLOAT32 speed_up_aw1[MAX_OPTIMIZE_CSV_NUM];             /*优化速度 上行 aw1*/
     UINT8 level_flag_up_aw1[MAX_OPTIMIZE_CSV_NUM];          /*优化级位标识 上行 aw1*/
-    UINT16 level_output_up_aw1[MAX_OPTIMIZE_CSV_NUM];       /*优化级位输出 上行 aw1*/
+    UINT8 level_output_up_aw1[MAX_OPTIMIZE_CSV_NUM];       /*优化级位输出 上行 aw1*/
     FLOAT32 speed_up_aw2[MAX_OPTIMIZE_CSV_NUM];             /*优化速度 上行 aw2*/
     UINT8 level_flag_up_aw2[MAX_OPTIMIZE_CSV_NUM];          /*优化级位标识 上行 aw2*/
-    UINT16 level_output_up_aw2[MAX_OPTIMIZE_CSV_NUM];       /*优化级位输出 上行 aw2*/
+    UINT8 level_output_up_aw2[MAX_OPTIMIZE_CSV_NUM];       /*优化级位输出 上行 aw2*/
     FLOAT32 speed_up_aw3[MAX_OPTIMIZE_CSV_NUM];             /*优化速度 上行 aw3*/
     UINT8 level_flag_up_aw3[MAX_OPTIMIZE_CSV_NUM];          /*优化级位标识 上行 aw3*/
-    UINT16 level_output_up_aw3[MAX_OPTIMIZE_CSV_NUM];       /*优化级位输出 上行 aw3*/
+    UINT8 level_output_up_aw3[MAX_OPTIMIZE_CSV_NUM];       /*优化级位输出 上行 aw3*/
 }OPTIMIZE_CSV;
 
 /*所有静态数据结构体*/
@@ -360,13 +361,13 @@ typedef struct
     UINT8 next_station_name[20]; /*下一站名称*/
     UINT8 next_station_arrive_time[20];/*下一站到达时间*/
     UINT8 next_station_leave_time[20]; /*下一站出发时间*/
-    UINT8 train_work_condition;        /*列车工况 1:牵引 2:巡航 3:惰行 4:制动 5:无效*/
+    UINT8 train_work_condition;        /*列车工况 1:牵引  2:惰行 3:制动 4:无效*/
     UINT8 train_work_level;            /*列车级位*/
     UINT32 train_distance;             /*列车公里标 m*/
     UINT8 train_time[20];              /*列车时间*/
     UINT16 next_speed_recommend;       /*下一推荐速度 km/h*/
-    UINT8 next_work_condition_recommend; /*下一推荐工况 1:牵引 2:巡航 3:惰行 4:制动 5:无效*/
-    UINT8 next_work_level_recommend; /*下一推荐工况 1:牵引 2:巡航 3:惰行 4:制动 5:无效*/
+    UINT8 next_work_condition_recommend; /*下一推荐工况 1:牵引  2:惰行 3:制动 4:无效*/
+    UINT8 next_work_level_recommend; /*下一推荐工况级位 1:牵引  2:惰行 3:制动 4:无效*/
     UINT16 next_recommend_countdown;   /*下一建议生效倒计时 s*/
     UINT32 next_recommend_distance;    /*下一建议生效距离 m*/
     UINT8 temporary_limit_num;         /*临时限速数量*/

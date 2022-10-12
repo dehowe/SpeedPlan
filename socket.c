@@ -740,7 +740,23 @@ UINT16 PackPeriodMsgToSignal(UINT8 *send_buffer)
     UINT16 target_speed;
     UINT8 level_flag;
     UINT8 level_output;
-    GetTargetSpeedByDistance(&target_speed,&level_flag);
+    UINT16 limit_speed;
+    //根据当前里程计算推荐速度、工况输出
+    GetTargetSpeedByDistance(&target_speed,&level_flag,&level_output);
+    UINT32 train_head_loc=g_period_msg_from_signal.train_distance;
+    UINT32 train_tail_loc;
+    if(g_period_msg_from_signal.train_direction==DIRECTION_DOWN)
+    {
+        train_tail_loc=(g_period_msg_from_signal.train_distance>g_train_param.train_length/100)?g_period_msg_from_signal.train_distance-g_train_param.train_length/100:0;
+    }
+    else
+    {
+        train_tail_loc=g_period_msg_from_signal.train_distance+g_train_param.train_length/100;
+    }
+
+    limit_speed = GetSpeedLimit(train_head_loc,train_tail_loc);
+    LogWrite(INFO,"%s,%s-%d,%s-%d,%s-%d,%s-%d","DATA","dis",train_head_loc,"target_spd",target_speed,"spd",g_period_msg_from_signal.train_speed,"ebi",limit_speed);
+    //printf("dis:%d,target_spd-%d,ebi-%d\n",train_head_loc,target_speed,limit_speed);
     g_speed_plan_info.target_speed=target_speed;
     /*消息打包*/
     UINT16 index=0;
@@ -752,15 +768,7 @@ UINT16 PackPeriodMsgToSignal(UINT8 *send_buffer)
     ShortToChar(g_speed_plan_info.target_speed,send_buffer+index);//打包推荐速度
     index+=2;
     send_buffer[index++]=level_flag;//打包工况标志
-    if (level_flag==1||level_flag==3)
-    {
-        level_output=SPEED_PLAN_TB_RATIO*100;
-    }
-    else
-    {
-        level_output=0;
-    }
     send_buffer[index++]=level_output;//打包工况级位
-    printf("target:%d,level:%d,output:%d\n",target_speed,level_flag,level_output);
+    //printf("target:%d,level:%d,output:%d\n",target_speed,level_flag,level_output);
     return index;
 }
