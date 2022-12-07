@@ -20,6 +20,8 @@ extern INIT_MSG_TO_APP g_init_msg_to_app;
 extern PERIOD_MSG_TO_APP g_period_msg_to_app;
 extern PERIOD_MSG_FROM_TRAIN g_period_msg_from_train;
 extern PERIOD_MSG_FROM_SIGNAL g_period_msg_from_signal;
+extern DEVICE_MAC_DATA g_device_mac_data;
+
 extern char g_current_time[20];
 extern UINT8 g_serve_app;
 extern UINT8 g_direction;
@@ -135,3 +137,4 @@ void RefreshPeriodMsgToAPP();
  * 返回值:   UINT16   send_buffer_length    消息长度
  *************************************************************************/
 UINT16 PackPeriodMsgToSignal(UINT8 *send_buffer);
+

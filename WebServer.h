@@ -135,6 +135,14 @@ UINT16 PackInitJsonDataToApp(char* json_data);
 UINT16 PackPeriodJsonDataToApp(char* json_data);
 
 /*************************************************************************
+* 功能描述: 打包发送给APP的触发JSON数据（驾驶建议曲线，停站阶段曲线优化结束后发送）
+        * 输入参数: 无
+        * 输出参数: 无
+        * 返回值: 无
+*************************************************************************/
+UINT16 PackTriggerJsonDataToApp(char* json_data);
+
+/*************************************************************************
  * 功能描述: 解析来自APP的数据，并进行相应处理
  * 输入参数:   char         *receive_buff       接收信息
  *           Ws_Client    *wsc                web socket client

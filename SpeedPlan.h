@@ -10,10 +10,14 @@ extern UINT16						g_aw_id;							// 载荷
 extern LINE_PARAMETER               g_line_param;                       // 线路参数
 extern STATIC_DATA_CSV              g_static_data_csv;                  // CSV静态数据
 extern SPEED_PLAN_INFO              g_speed_plan_info;                  // 速度规划信息
+extern PLAN_CONFIG_INFO             g_plan_config_info;                 // 运行计划配置数据
 extern UINT16                       g_speed_curve_offline[MAX_SPEED_CURVE];  //离线优化速度存储数组
 extern UINT8                        g_level_flag[MAX_SPEED_CURVE];    //离线优化级位存储数组
 extern UINT8                        g_level_output[MAX_SPEED_CURVE];    //离线优化级位存储数组
 extern FLOAT32                      g_plan_time[MAX_SPEED_CURVE];            //离线优化运行时分存储数组
+extern UINT16                       g_dim;                                  //存储数组数量
+extern UINT16                       g_discrete_size;					// 离散步长
+
 /*************************************************************************
 * 功能描述: 速度规划主程序
 * 输入参数: 无
@@ -21,6 +25,14 @@ extern FLOAT32                      g_plan_time[MAX_SPEED_CURVE];            //�
 * 返回值:   无
 *************************************************************************/
 void SpeedPlanMain();
+
+/*************************************************************************
+* 功能描述: 完整接口的曲线优化触发入口
+* 输入参数: 无
+* 输出参数: 无
+* 返回值:   无
+*************************************************************************/
+void SpeedPlanMainByCompleteInterface();
 
 /*************************************************************************
 * 功能描述: 离线求解算法入口

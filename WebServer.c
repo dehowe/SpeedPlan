@@ -508,6 +508,7 @@ void *WebSocketServer()
     UINT8 result;
     UINT16 length=0;
     char send_buff[1024*10];
+    char send_buff_trigger[1024*20];
     //服务器必须参数
     Ws_Server *wss = ws_server_create(
             9999,       //服务器端口
@@ -522,7 +523,7 @@ void *WebSocketServer()
     {
         //200ms周期
         ws_delayms(200);
-        //打包数据
+        //打包200ms周期数据
         length=PackPeriodJsonDataToApp(send_buff);
         //每200ms推送信息给所有客户端
         for (i = 0; i < WS_SERVER_CLIENT; i++)
@@ -546,6 +547,25 @@ void *WebSocketServer()
 //                }
             }
         }
+        //触发数据发送检查
+        if(g_speed_plan_info.optimize_send_flag==1)
+        {
+            g_speed_plan_info.optimize_send_flag=0;
+            //打包数据
+            length=PackTriggerJsonDataToApp(send_buff_trigger);
+            for (i = 0; i < WS_SERVER_CLIENT; i++)
+            {
+                if (wss->client[i].fd && wss->client[i].isLogin && !wss->client[i].exitType)
+                {
+                    result = ws_send(wss->client[i].fd, send_buff_trigger, length, false, WDT_TXTDATA);
+                    //发送失败,标记异常(后续会被自动回收)
+                    if (result < 0)
+                        wss->client[i].exitType = WET_SEND;
+                    printf("%s send msg 205 to %d,msg length %d\n",g_current_time,wss->client[i].fd,length);
+                }
+            }
+        }
+
     }
 
     ws_server_release(&wss);
@@ -761,6 +781,9 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     //下一站ID
     sprintf(temp,"%d",g_speed_plan_info.next_station_id);
     cJSON_AddStringToObject(pRoot,"next_station_id",temp);
+    //列车计划下一车车站发车时分
+    sprintf(temp,"%s",g_period_msg_to_app.current_station_leave_time);
+    cJSON_AddStringToObject(pRoot,"station_leave_time",temp);
     //列车计划到达下一车站名称
     sprintf(temp,"%s",g_period_msg_to_app.next_station_name);
     //printf("test:%s\n",temp);
@@ -816,8 +839,61 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     char *szJSON = cJSON_Print(pRoot);
     //printf("%s\n", szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
-    free(szJSON);
     length= strlen(szJSON);
+    free(szJSON);
+    return length;
+}
+
+/*************************************************************************
+* 功能描述: 打包发送给APP的触发JSON数据（驾驶建议曲线，停站阶段曲线优化结束后发送）
+        * 输入参数: 无
+        * 输出参数: 无
+        * 返回值: 无
+*************************************************************************/
+UINT16 PackTriggerJsonDataToApp(char* json_data)
+{
+    UINT16 length=0;
+    UINT32 distance_temp=0;
+    cJSON* pRoot = cJSON_CreateObject();
+    cJSON* pArray;
+    cJSON* pItem;
+    char temp[50];
+    //消息标识
+    cJSON_AddStringToObject(pRoot,"msg_type","205");
+    //当前站
+    sprintf(temp,"%d",g_speed_plan_info.current_station_id);
+    cJSON_AddStringToObject(pRoot,"current_station_id",temp);
+    //下一站
+    sprintf(temp,"%d",g_speed_plan_info.next_station_id);
+    cJSON_AddStringToObject(pRoot,"next_station_id",temp);
+    //运行方向
+    sprintf(temp,"%d",g_direction);
+    cJSON_AddStringToObject(pRoot,"direction",temp);
+    //曲线优化数据
+    pArray = cJSON_CreateArray();
+    cJSON_AddItemToObject(pRoot,"recommend_info",pArray);
+    for(int i=0;i<=g_dim;i++)
+    {
+        if (g_direction==DIRECTION_DOWN)
+        {
+            distance_temp=g_speed_plan_info.interval_begin_dis+i*g_discrete_size/100;
+        }
+        else
+        {
+            distance_temp=g_speed_plan_info.interval_begin_dis-i*g_discrete_size/100;
+        }
+        pItem = cJSON_CreateObject();
+        sprintf(temp,"%d",distance_temp);
+        cJSON_AddStringToObject(pItem,"distance",temp);
+        sprintf(temp,"%f",3.6*g_speed_curve_offline[i]/100);
+        cJSON_AddStringToObject(pItem,"speed",temp);
+        cJSON_AddItemToArray(pArray,pItem);
+    }
+    char *szJSON = cJSON_Print(pRoot);
+    //printf("%s\n", szJSON);
+    memcpy(json_data,szJSON, strlen(szJSON));
+    length= strlen(szJSON);
+    free(szJSON);
     return length;
 }
 
@@ -869,6 +945,25 @@ UINT8 GetDeviceValid(UINT32 device_id)
     return find_result;
 }
 
+/*************************************************************************
+ * 功能描述: 检查输入的设备MAC地址是否在白名单内
+ * 输入参数: CHAR*    device_mac     设备mac
+ * 输出参数: 无
+ * 返回值:   UINT8   0:否 1：是
+ *************************************************************************/
+UINT8 CheckDeviceMacValidity(CHAR* device_mac)
+{
+    UINT8 result=0;
+    for(int i=0;i<g_device_mac_data.device_num;i++)
+    {
+        if(strcmp(g_device_mac_data.device_mac_list[i],device_mac)==0)
+        {
+            result=1;
+            break;
+        }
+    }
+    return result;
+}
 
 /*************************************************************************
  * 功能描述: 解析来自APP的数据，并进行相应处理
@@ -882,20 +977,20 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
     UINT8 result;
     UINT16 length=0;
     UINT16 message_id=0;
-    UINT32 device_id=0;
     UINT8 serve_flag=0;
+    CHAR* device_mac;
     cJSON* pRoot;
     char send_buff[1024*10];
     pRoot= cJSON_Parse(receive_buff);
     message_id= (UINT16)cJSON_GetObjectItem(pRoot,"msg_type")->valueint;
-    device_id= (UINT32)cJSON_GetObjectItem(pRoot,"device_id")->valueint;
-    serve_flag= (UINT8)cJSON_GetObjectItem(pRoot,"serve_flag")->valueint;
-    result=GetDeviceValid(device_id);//判断此设备是否登记
+    device_mac=cJSON_GetObjectItem(pRoot,"device_id")->valuestring;
+    result=CheckDeviceMacValidity(device_mac);
     if (1==result)
     {
         switch (message_id)
         {
             case 103:
+                serve_flag= (UINT8)cJSON_GetObjectItem(pRoot,"serve_flag")->valueint;
                 if(serve_flag==1)
                 {
                     wsc->serveFlag=1;
@@ -930,6 +1025,7 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                 }
                 break;
             case 104:
+                serve_flag= (UINT8)cJSON_GetObjectItem(pRoot,"serve_flag")->valueint;
                 if(serve_flag==1&&wsc->serveFlag==1)
                 {
                     wsc->serveFlag=2;
@@ -951,6 +1047,24 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                         printf("%s WEB SOCKET:send error message 203 to APP success!\n",g_current_time);
                 }
 
+                break;
+            case 105:
+                g_plan_config_info.plan_flag=1;//运行计划更新
+                g_plan_config_info.train_id=(UINT32)cJSON_GetObjectItem(pRoot,"train_id")->valueint;
+                g_plan_config_info.direction=(UINT8)cJSON_GetObjectItem(pRoot,"direction")->valueint;
+                g_plan_config_info.plan_flag=(UINT8)cJSON_GetObjectItem(pRoot,"plan_flag")->valueint;
+                cJSON *array=cJSON_GetObjectItem(pRoot,"plan_config");
+                g_plan_config_info.plan_station_num= cJSON_GetArraySize(array);
+                for(int i=0;i<g_plan_config_info.plan_station_num;i++)
+                {
+                    cJSON *array_item = cJSON_GetArrayItem(array,i);
+                    CHAR* str_temp=cJSON_GetObjectItem(array_item,"name")->valuestring;
+                    memcpy(g_plan_config_info.plan_station_info[i].station_name,str_temp,20);//解析站名称
+                    g_plan_config_info.plan_station_info[i].distance=(UINT32)cJSON_GetObjectItem(array_item,"distance")->valueint;
+                    g_plan_config_info.plan_station_info[i].station_id=(UINT8)cJSON_GetObjectItem(array_item,"station_id")->valueint;
+                    g_plan_config_info.plan_station_info[i].jump_flag=(UINT8)cJSON_GetObjectItem(array_item,"is_jump")->valueint;
+                }
+                printf("%s WEB SOCKET:receive message 105 from APP!\n",g_current_time);
                 break;
             default:
                 break;

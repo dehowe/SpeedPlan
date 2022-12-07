@@ -5,10 +5,13 @@ UINT16						g_aw_id;							// 载荷
 LINE_PARAMETER              g_line_param;                       // 线路参数 下行
 STATIC_DATA_CSV             g_static_data_csv;                  // CSV静态数据
 SPEED_PLAN_INFO             g_speed_plan_info;                  // 速度规划信息
+PLAN_CONFIG_INFO            g_plan_config_info;                 // 运行计划配置数据
 UINT16                      g_speed_curve_offline[MAX_SPEED_CURVE];  //离线优化速度存储数组
 UINT8                       g_level_flag[MAX_SPEED_CURVE];    //离线优化级位存储数组
 UINT8                       g_level_output[MAX_SPEED_CURVE];    //离线优化级位存储数组
 FLOAT32                     g_plan_time[MAX_SPEED_CURVE];            //离线优化运行时分存储数组
+UINT16                      g_dim;                                  //存储数组数量
+UINT16                      g_discrete_size = 2000;					// 离散步长
 
 /*速度规划相关变量*/
 FLOAT32* gradient = NULL;						 // 初始化区间坡度存储指针;
@@ -29,7 +32,7 @@ UINT32	target_time_online;						// 在线优化目标运行时分
 UINT16	dim;									// 建模离散维度
 UINT8	limit_num;								// 限速切换点个数
 UINT16  solution_num = 50;						// 解空间大小
-UINT16  discrete_size = 2000;					// 离散步长
+//UINT16  discrete_size = 2000;					// 离散步长
 FLOAT32 optimal_time_offline = 0;				// 离线优化运行时分
 UINT16 remain_section_length;					// 区间进行等间隔离散后的剩余长度
 
@@ -48,7 +51,6 @@ void SpeedPlanMain()
         g_period_msg_from_signal.train_plan_flag=0;
         //参数校验
         UINT8 data_error_flag=0;//数据异常标志 0：无异常 1：数据异常
-        g_speed_plan_info.current_direction=g_period_msg_from_signal.train_direction;//列车运行方向
         g_speed_plan_info.interval_begin_dis=g_period_msg_from_signal.train_distance;//区间起始位置为列车头部位置
         //memcpy(g_speed_plan_info.next_station_name,g_period_msg_from_signal.next_staion_name,20);
         g_speed_plan_info.next_station_id=g_period_msg_from_signal.next_station_id;//下一站编号
@@ -72,7 +74,7 @@ void SpeedPlanMain()
             {
                 g_speed_plan_info.interval_end_dis=g_static_data_csv.station_csv.begin_distance[i];//区间起结束位置为下一站公里标位置
                 //如果运行方向为下行
-                if(g_speed_plan_info.current_direction==0)
+                if(g_direction==DIRECTION_DOWN)
                 {
                     if(g_speed_plan_info.interval_end_dis<g_speed_plan_info.interval_begin_dis)
                     {
@@ -105,12 +107,6 @@ void SpeedPlanMain()
                 break;
             }
         }
-
-        //test
-//        g_speed_plan_info.interval_begin_dis=0;
-//        g_speed_plan_info.interval_end_dis=4280;
-//        g_speed_plan_info.target_time=200;
-//        data_error_flag=0;
         //如果数据无异常
         if (data_error_flag==0)
         {
@@ -123,11 +119,9 @@ void SpeedPlanMain()
                 perror("Fail to create server thread");
             }
         }
-
-
-
     }
 }
+
 
 /*************************************************************************
 * 功能描述: 离线求解算法入口
@@ -153,25 +147,37 @@ void *SpeedPlanOffline()
 
     //数据准备
     GetBaseDataReady();
+    //根据区间长度设置不同的离散大小
+    if(interval_length>8000)
+    {
+        g_discrete_size = 4000;
+    }
+    else if(interval_length>20000)
+    {
+        g_discrete_size = 10000;
+    }
+    else
+    {
+        g_discrete_size = 2000;
+    }
 
     //离线求解
     //出口参数初始化
     memset(level_output_flag, 0, MAX_SPEED_CURVE * sizeof(UINT16));
-    dim = GetOptimalSpeedOffline(speed_curve_offline, discrete_size, speed_limit_max, speed_limit_min, speed_limit_mmax,
+    dim = GetOptimalSpeedOffline(speed_curve_offline, g_discrete_size, speed_limit_max, speed_limit_min, speed_limit_mmax,
                                  interval_length_cm, speed_limit_location, speed_limit, limit_num, target_time_offline, solution_num);
     //sleep(10);//模拟板卡求解时间
 
 
     DivideStageByOptimizeSpeed();
-    g_speed_plan_info.optimize_stage=2;
+    g_speed_plan_info.optimize_stage=2;//优化完成
+    g_speed_plan_info.optimize_send_flag=1;//可以向app发送优化数据
     g_speed_plan_info.optimize_station=g_speed_plan_info.next_station_id;
     g_speed_plan_info.interval=interval_length;
     UINT32 finish = clock();
     UINT32 cal_time=(finish - start) / 1000;
     printf("%s SPEED_PLAN:solve end, use time % d ms!\n",g_current_time, cal_time);
     LogWrite(INFO,"%s:%d%s","end:use_time",cal_time,"ms");
-
-
 
     free(gradient);
     free(curve_radius);
@@ -213,8 +219,8 @@ UINT8 GetBaseDataReady()
 //        line_param_temp = &g_line_param_up;
 //    }
 
-    //如果运行方向为上行
-    if (g_speed_plan_info.current_direction==0)
+    //如果运行方向为下行
+    if (g_direction==DIRECTION_DOWN)
     {
         /*曲线优化所需数据准备*/
         if(g_speed_plan_info.interval_begin_dis<=line_param_temp->line_length&&g_speed_plan_info.interval_end_dis<=line_param_temp->line_length)
@@ -315,10 +321,10 @@ UINT8 GetBaseDataReady()
             speed_limit_location[k] = g_speed_plan_info.interval_begin_dis*100-g_speed_plan_info.interval_end_dis*100;
             speed_limit[k] = line_param_temp->limit[g_speed_plan_info.interval_end_dis/line_param_temp->discrete_size];
             limit_num = k+1;
-            for(int i=0;i<limit_num;i++)
-            {
-                //printf("loc:%d,limit:%d\n", speed_limit_location[i], speed_limit[i]);
-            }
+//            for(int i=0;i<limit_num;i++)
+//            {
+//                printf("loc:%d,limit:%d\n", speed_limit_location[i], speed_limit[i]);
+//            }
 
             for (int i=line_param_temp->discrete_num-1;i>=0;i--)
             {
@@ -465,7 +471,7 @@ void Modeling(UINT16* speed_limit_max, UINT16* speed_limit_min, UINT16* speed_li
         speed_limit_max[i] = speed_limit_temp[i];
         speed_limit_min[i] = 0;
         //printf("最大防护速度%d\n", speed_limit_max[i]);
-        //LogWrite(INFO,"%s:%d","max_speed",speed_limit_max[i]);
+        LogWrite(INFO,"%s:%d","max_speed",speed_limit_max[i]);
     }
     /*释放所申请的内存, 防止内存泄露*/
     free(speed_limit_temp);
@@ -1091,7 +1097,7 @@ void GetOptimizeSpeedIndex(UINT32 *distance,UINT16 *optimize_speed,UINT8 *level,
     UINT8 *work_temp=NULL;    //离线优化工况临时指针
     UINT8 *work_output_temp=NULL;    //离线优化工况级位临时指针
     //根据运行方向、载荷找到相应离线优化速度和工况
-    if(g_speed_plan_info.current_direction==DIRECTION_DOWN)
+    if(g_direction==DIRECTION_DOWN)
     {
         switch (g_aw_id)
         {
@@ -1156,7 +1162,7 @@ void GetOptimizeSpeedIndex(UINT32 *distance,UINT16 *optimize_speed,UINT8 *level,
     {
         UINT16 optimize_num=0;
         //根据运行方向，提取对应当前区间的速度曲线和工况
-        if(g_speed_plan_info.current_direction==DIRECTION_DOWN) {
+        if(g_direction==DIRECTION_DOWN) {
             //遍历静态速度数据
             for (int i = 0; i < g_static_data_csv.optimize_csv.length; i++)
             {
@@ -1220,6 +1226,7 @@ UINT8 DivideStageByOptimizeSpeed()
         GetOptimizeSpeedIndex(optimize_distance,optimize_speed,optimize_work,optimize_work_output,&optimize_num);
         //更新该区间离线优化速度、工况级位、工况输出
         dim=optimize_num-1;
+        g_dim=dim;//将解空间维度赋值全局变量
         for(int i=0;i<=dim;i++)
         {
             //此逻辑主要解决列车停车欠标，查询到离线优化速度为0时的特殊处理
@@ -1238,6 +1245,7 @@ UINT8 DivideStageByOptimizeSpeed()
     else
     {
         g_speed_plan_info.optimize_mode=1;//采用在线优化数据
+        g_dim=dim;//将解空间维度赋值全局变量
         for (int i = 0; i <= dim; i++)
         {
             g_speed_curve_offline[i]=speed_curve_offline[i];
@@ -1266,15 +1274,15 @@ UINT8 DivideStageByOptimizeSpeed()
         }
     }
     //下行
-    if (g_speed_plan_info.current_direction==DIRECTION_DOWN)
+    if (g_direction==DIRECTION_DOWN)
     {
         //启动牵引阶段划分为3个子阶段
-        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=traction_num/3*discrete_size/100+g_speed_plan_info.interval_begin_dis;
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=traction_num/3*g_discrete_size/100+g_speed_plan_info.interval_begin_dis;
         g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[traction_num/3];
         g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
         g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
         g_speed_plan_info.recommend_change_num+=1;
-        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=2*traction_num/3*discrete_size/100+g_speed_plan_info.interval_begin_dis;
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=2*traction_num/3*g_discrete_size/100+g_speed_plan_info.interval_begin_dis;
         g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[2*traction_num/3];
         g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
         g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
@@ -1285,7 +1293,7 @@ UINT8 DivideStageByOptimizeSpeed()
         {
             if(g_level_flag[i]!=work_index)
             {
-                g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=i*discrete_size/100+g_speed_plan_info.interval_begin_dis;
+                g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=i*g_discrete_size/100+g_speed_plan_info.interval_begin_dis;
                 g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[i];
                 g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=g_level_flag[i];
                 g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
@@ -1308,12 +1316,12 @@ UINT8 DivideStageByOptimizeSpeed()
             return 0;//数据异常直接退出
         }
         //启动牵引阶段划分为3个子阶段
-        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-traction_num/3*discrete_size/100;
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-traction_num/3*g_discrete_size/100;
         g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[traction_num/3];
         g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
         g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=traction_num/3;
         g_speed_plan_info.recommend_change_num+=1;
-        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-2*traction_num/3*discrete_size/100;
+        g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-2*traction_num/3*g_discrete_size/100;
         g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[2*traction_num/3];
         g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=1;
         g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=2*traction_num/3;
@@ -1324,7 +1332,7 @@ UINT8 DivideStageByOptimizeSpeed()
         {
             if(g_level_flag[i]!=work_index)
             {
-                g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-i*discrete_size/100;
+                g_speed_plan_info.recommend_distance[g_speed_plan_info.recommend_change_num]=g_speed_plan_info.interval_begin_dis-i*g_discrete_size/100;
                 g_speed_plan_info.recommend_speed[g_speed_plan_info.recommend_change_num]=g_speed_curve_offline[i];
                 g_speed_plan_info.recommend_wrok[g_speed_plan_info.recommend_change_num]=g_level_flag[i];
                 g_speed_plan_info.recommend_index[g_speed_plan_info.recommend_change_num]=i;
@@ -1447,8 +1455,8 @@ UINT8 GetRecSpdAndWorkByDis(UINT32 distance,UINT16 *rec_speed,UINT8 *rec_work,UI
         /*计算生效距离*/
         *rec_distance=(g_speed_plan_info.recommend_distance[next_recommend_index]-distance)>0?(g_speed_plan_info.recommend_distance[next_recommend_index]-distance):0;
         /*计算生效倒计时*/
-        current_index=100*(distance-g_speed_plan_info.interval_begin_dis)/discrete_size;
-        *rec_cutdown=GetTimeByIndex(current_index,g_speed_plan_info.recommend_index[next_recommend_index],g_speed_curve_offline,discrete_size);
+        current_index=100*(distance-g_speed_plan_info.interval_begin_dis)/g_discrete_size;
+        *rec_cutdown=GetTimeByIndex(current_index,g_speed_plan_info.recommend_index[next_recommend_index],g_speed_curve_offline,g_discrete_size);
     }
     /*如果是上行*/
     else
@@ -1488,8 +1496,8 @@ UINT8 GetRecSpdAndWorkByDis(UINT32 distance,UINT16 *rec_speed,UINT8 *rec_work,UI
         /*计算生效距离*/
         *rec_distance=(distance-g_speed_plan_info.recommend_distance[next_recommend_index])>0?(distance-g_speed_plan_info.recommend_distance[next_recommend_index]):0;
         /*计算生效倒计时*/
-        current_index=100*(g_speed_plan_info.interval_begin_dis-distance)/discrete_size;
-        *rec_cutdown=GetTimeByIndex(current_index,g_speed_plan_info.recommend_index[next_recommend_index],g_speed_curve_offline,discrete_size);
+        current_index=100*(g_speed_plan_info.interval_begin_dis-distance)/g_discrete_size;
+        *rec_cutdown=GetTimeByIndex(current_index,g_speed_plan_info.recommend_index[next_recommend_index],g_speed_curve_offline,g_discrete_size);
     }
 
 }
@@ -1508,7 +1516,7 @@ void GetTargetSpeedByDistance(UINT16 *target_speed,UINT8 *level_flag,UINT8 *leve
     int i;
     UINT32 distance_temp;
     //下行
-    if (g_speed_plan_info.current_direction==DIRECTION_DOWN)
+    if (g_direction==DIRECTION_DOWN)
     {
         if(g_period_msg_from_signal.train_distance>g_speed_plan_info.interval_begin_dis)
         {
@@ -1532,15 +1540,15 @@ void GetTargetSpeedByDistance(UINT16 *target_speed,UINT8 *level_flag,UINT8 *leve
         }
     }
     //如果当前优化完成
-    if (g_speed_plan_info.optimize_stage==2&&g_speed_plan_info.optimize_station==g_speed_plan_info.next_station_id)
+    if (g_speed_plan_info.optimize_stage==2&&g_speed_plan_info.optimize_station==g_period_msg_from_signal.next_station_id)
     {
         for (i = 0; i < dim; i++)
         {
-            if (distance_temp>=i*discrete_size&&distance_temp<(i+1)*discrete_size)
+            if (distance_temp>=i*g_discrete_size&&distance_temp<(i+1)*g_discrete_size)
             {
                 if (i!=0)
                 {
-                    *target_speed=(UINT16)(1.0*g_speed_curve_offline[i]+1.0*(distance_temp-discrete_size*i)*(g_speed_curve_offline[i+1]-g_speed_curve_offline[i])/discrete_size);
+                    *target_speed=(UINT16)(1.0*g_speed_curve_offline[i]+1.0*(distance_temp-g_discrete_size*i)*(g_speed_curve_offline[i+1]-g_speed_curve_offline[i])/g_discrete_size);
                     *level_flag=g_level_flag[i];
                     *level_output=g_level_output[i];
                 }

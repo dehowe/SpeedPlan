@@ -1,9 +1,10 @@
 #include "socket.h"
 
-INIT_MSG_TO_APP g_init_msg_to_app;
-PERIOD_MSG_TO_APP g_period_msg_to_app;
-PERIOD_MSG_FROM_TRAIN g_period_msg_from_train;
-PERIOD_MSG_FROM_SIGNAL g_period_msg_from_signal;
+INIT_MSG_TO_APP g_init_msg_to_app;                //发送给APP的静态数据，全局变量
+PERIOD_MSG_TO_APP g_period_msg_to_app;            //发送给APP的周期数据，全局变量
+PERIOD_MSG_FROM_TRAIN g_period_msg_from_train;    //车辆系统发送的周期数据，全局变量
+PERIOD_MSG_FROM_SIGNAL g_period_msg_from_signal;  //信号系统发送的周期数据，全局变量
+DEVICE_MAC_DATA g_device_mac_data;                 //白名单设备MAC地址，全局变量
 char g_current_time[20]="1970-01-01 00:00:00"; //当前时钟，跟信号系统同步
 UINT8 g_direction=0; //列车运行方向 1：上行 0：下行
 
@@ -203,26 +204,29 @@ void *server_handle(void *arg)
                 {
                     //LogWrite(INFO,"%s","SOCKET:receive message 101 from TRAIN NET,unpack success!");
                     //printf("SOCKET:receive message 101 from TRAIN NET,unpack success!\n");
-                }
-                break;
-            case 102:
-                //信号系统
-                unpack_result = UnpackePeriodMsgFromSignal(recvbuf,recv_size);
-                if(unpack_result==0)
-                {
-                    LogWrite(INFO,"%s","SOCKET:receive message 102 from SIGNAL,unpack error!");
-                    printf("SOCKET:receive message 102 from SIGNAL,unpack error!\n");
-                }
-                else
-                {
-                    //LogWrite(INFO,"%s","SOCKET:receive message 102 from SIGNAL,unpack success!");
-                    //printf("SOCKET:receive message 102 from SIGNAL,unpack success!\n");
                     //发送推荐速度（实验室仿真测试）
                     UINT16 message_length=PackPeriodMsgToSignal(sendbuf);
                     send(client_fd, sendbuf, message_length, 0);
-                };
-
+                }
                 break;
+//            case 102:
+//                //信号系统
+//                unpack_result = UnpackePeriodMsgFromSignal(recvbuf,recv_size);
+//                if(unpack_result==0)
+//                {
+//                    LogWrite(INFO,"%s","SOCKET:receive message 102 from SIGNAL,unpack error!");
+//                    printf("SOCKET:receive message 102 from SIGNAL,unpack error!\n");
+//                }
+//                else
+//                {
+//                    //LogWrite(INFO,"%s","SOCKET:receive message 102 from SIGNAL,unpack success!");
+//                    //printf("SOCKET:receive message 102 from SIGNAL,unpack success!\n");
+//                    //发送推荐速度（实验室仿真测试）
+//                    UINT16 message_length=PackPeriodMsgToSignal(sendbuf);
+//                    send(client_fd, sendbuf, message_length, 0);
+//                };
+//
+//                break;
             default:
                 break;
         }
@@ -231,6 +235,15 @@ void *server_handle(void *arg)
     }
 
     close(client_fd);//关闭与此客户端的socket
+    for(int i=0;i<MAX_NUM_CLIENT;i++)
+    {
+        if(client_fds[i]==client_fd)
+        {
+            printf("client_fds[%d] has been left!\n",i);
+            client_fds[i]=0;
+            break;
+        }
+    }
     pthread_exit(0);//此线程退出
 }
 
@@ -333,6 +346,58 @@ UINT8 UnpackePeriodMsgFromTrainNet(UINT8 *receive_buffer,UINT16 receive_length)
         }
         LogWrite(INFO,"%s:%s,%s-%d,%s-%d,%s-%d,%s-%d","ENERGY:",g_current_time,"work",g_period_msg_from_signal.train_work_condition,"spd",g_period_msg_from_signal.train_speed,
                  "dis",g_period_msg_from_signal.train_distance,"target_spd",g_speed_plan_info.target_speed);
+        //解析实时数据
+        memset(&g_period_msg_from_signal,0,sizeof(g_period_msg_from_signal));//清空存储结构体
+        g_period_msg_from_signal.traction_energy= LongFromChar(index);//解析列车当前区间累积牵引能耗
+        index+=4;
+        g_period_msg_from_signal.regeneration_energy= LongFromChar(index);//解析列车当前区间累积再生能量
+        index+=4;
+        g_period_msg_from_signal.train_direction=*(index++);//解析列车运行方向
+        g_period_msg_from_signal.train_id= LongFromChar(index);//解析列车车次号
+        index+=4;
+        g_period_msg_from_signal.train_number= LongFromChar(index);//解析列车车组号
+        index+=4;
+        g_period_msg_from_signal.arrive_flag=*(index++);//解析停准停稳标识
+        g_period_msg_from_signal.leave_flag=*(index++);//解析允许发车标识
+        g_period_msg_from_signal.door_flag=*(index++);//解析车门状态
+        g_period_msg_from_signal.train_plan_flag=*(index++);//解析列车运行计划更新标识
+        g_period_msg_from_signal.train_ebi=ShortFromChar(index);//解析ATP防护速度
+        index+=2;
+        g_period_msg_from_signal.train_speed=ShortFromChar(index);//解析列车实时速度
+        index+=2;
+//        memcpy(g_period_msg_from_signal.next_staion_name,index,20);//解析下一到达站名称
+//        index+=20;
+        g_period_msg_from_signal.next_station_id=ShortFromChar(index);//解析下一站编号
+        index+=2;
+        memcpy(g_period_msg_from_signal.next_station_arrive_time,index,20);//解析下一站到达时间
+        index+=20;
+        memcpy(g_period_msg_from_signal.next_station_leave_time,index,20);//解析下一站发车时间
+        index+=20;
+        g_period_msg_from_signal.train_work_condition=*(index++);//解析列车实时工况
+        g_period_msg_from_signal.train_work_level=*(index++);//解析列车实时级位
+        g_period_msg_from_signal.train_distance_last=g_period_msg_from_signal.train_distance;//保存上周期公里标
+        g_period_msg_from_signal.train_distance= LongFromChar(index);//解析列车公里标
+        index+=4;
+        memcpy(g_period_msg_from_signal.train_time,index,20);//解析列车当前时间
+        index+=20;
+        g_period_msg_from_signal.temporary_limit_num=ShortFromChar(index);//解析临时限速数量
+        index+=2;
+        for(int i=0;i<g_period_msg_from_signal.temporary_limit_num;i++)
+        {
+            g_period_msg_from_signal.temporary_limit_begin_distance[i]=LongFromChar(index);//解析临时限速起始公里标
+            index+=4;
+            g_period_msg_from_signal.temporary_limit_end_distance[i]=LongFromChar(index);//解析临时限速结束公里标
+            index+=4;
+            g_period_msg_from_signal.temporary_limit_value[i]=ShortFromChar(index);//解析临时限速值
+            index+=2;
+        }
+        //全局变量更新
+        memcpy(g_current_time,g_period_msg_from_signal.train_time,20);//解析列车当前时间
+        g_direction=g_period_msg_from_signal.train_direction;
+        if(g_direction==DIRECTION_UP)
+        {
+            UINT8 A=0;
+        }
         result = 1;//解析成功
         return result;
     }
@@ -403,6 +468,7 @@ UINT8 UnpackePeriodMsgFromSignal(UINT8 *receive_buffer,UINT16 receive_length)
         //全局变量更新
         memcpy(g_current_time,g_period_msg_from_signal.train_time,20);//解析列车当前时间
         g_direction=g_period_msg_from_signal.train_direction;
+
         result = 1;//解析成功
         return result;
     }
@@ -560,6 +626,8 @@ void RefreshPeriodMsgToAPP()
     g_period_msg_to_app.leave_flag=g_period_msg_from_signal.leave_flag;
     g_period_msg_to_app.train_ebi=g_period_msg_from_signal.train_ebi;
     g_period_msg_to_app.train_speed=g_period_msg_from_signal.train_speed;
+
+    memcpy(g_period_msg_to_app.current_station_leave_time,g_period_msg_from_signal.current_station_leave_time,20);//打包当前站出发时间
     memcpy(g_period_msg_to_app.next_station_name,g_period_msg_from_signal.next_staion_name,20);//打包下一站名词
     memcpy(g_period_msg_to_app.next_station_arrive_time,g_period_msg_from_signal.next_station_arrive_time,20);//打包下一站到达时间
     memcpy(g_period_msg_to_app.next_station_leave_time,g_period_msg_from_signal.next_station_leave_time,20);//打包下一站出发时间
@@ -772,3 +840,4 @@ UINT16 PackPeriodMsgToSignal(UINT8 *send_buffer)
     //printf("target:%d,level:%d,output:%d\n",target_speed,level_flag,level_output);
     return index;
 }
+

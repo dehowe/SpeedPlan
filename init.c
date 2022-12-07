@@ -1060,4 +1060,23 @@ UINT32 CalEnergyByUI(UINT32 voltage,UINT32 current,FLOAT32 cycle_time)
 
 }
 
+/*************************************************************************
+ * 功能描述: 初始化白名单设备MAC地址
+ * 输入参数: 无
+ * 输出参数: 无
+ * 返回值:   UINT8   1:初始化成功 0：初始化失败
+ *************************************************************************/
+UINT8 DeviceMacDataInit()
+{
+    CHAR DATA[MAX_DEVICE_NUM][30]={"E0:38:2D:4F:FF:EC","E0:38:2D:4F:FF:ED","E0:38:2D:4F:FF:EE","E0:38:2D:4F:FF:EF",
+                                   "E0:38:2D:4F:FF:F0","E0:38:2D:4F:FF:F1","E0:38:2D:4F:FF:F2","E0:38:2D:4F:FF:F3","E0:38:2D:4F:FF:F4",
+                                   "E0:38:2D:4F:FF:F5","E0:38:2D:4F:FF:F6","E0:38:2D:4F:FF:F7","E0:38:2D:4F:FF:F8","E0:38:2D:4F:FF:F9",
+                                   "E0:38:2D:4F:FF:FA","E0:38:2D:4F:FF:FB","E0:38:2D:4F:FF:FC","E0:38:2D:4F:FF:FD","E0:38:2D:4F:FF:FE",
+                                   "E0:38:2D:4F:FF:FE","E0:38:2D:4F:FF:FF"};
+    g_device_mac_data.device_num=20;
+    for (int i = 0; i < g_device_mac_data.device_num; i++)
+    {
+        memcpy(g_device_mac_data.device_mac_list[i],DATA[i],30);
+    }
+}
 #pragma endregion
