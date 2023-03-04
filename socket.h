@@ -12,6 +12,7 @@
 #include "SpeedPlan.h"
 #include <arpa/inet.h>
 #include "init.h"
+#include "can.h"
 
 #define PORT 8888
 #define MAX_NUM_CLIENT 5
@@ -26,6 +27,7 @@ extern char g_current_time[20];
 extern UINT8 g_serve_app;
 extern UINT8 g_direction;
 extern UINT8 g_serve_app_send;
+extern UINT8 g_speed_plan_flag; //是否进行曲线优化的标志 1：开始 0：未开始
 
 int socket_init();
 void *socket_manager();
@@ -137,4 +139,12 @@ void RefreshPeriodMsgToAPP();
  * 返回值:   UINT16   send_buffer_length    消息长度
  *************************************************************************/
 UINT16 PackPeriodMsgToSignal(UINT8 *send_buffer);
+
+/*************************************************************************
+* 功能描述: 主程序初始化
+* 输入参数: 无
+* 输出参数: 无
+* 返回值:
+*************************************************************************/
+void ProgramInit();
 

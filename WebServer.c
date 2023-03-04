@@ -781,7 +781,7 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     //下一站ID
     sprintf(temp,"%d",g_speed_plan_info.next_station_id);
     cJSON_AddStringToObject(pRoot,"next_station_id",temp);
-    //列车计划下一车车站发车时分
+    //当前车站发车时分
     sprintf(temp,"%s",g_period_msg_to_app.current_station_leave_time);
     cJSON_AddStringToObject(pRoot,"station_leave_time",temp);
     //列车计划到达下一车站名称
@@ -806,21 +806,38 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     //当前运行时分
     sprintf(temp,"%s",g_period_msg_to_app.train_time);
     cJSON_AddStringToObject(pRoot,"time",temp);
-    //下一阶段推荐速度
-    sprintf(temp,"%d",g_period_msg_to_app.next_speed_recommend);
-    cJSON_AddStringToObject(pRoot,"next_speed_recommend",temp);
-    //下一阶段推荐工况
-    sprintf(temp,"%d",g_period_msg_to_app.next_work_condition_recommend);
-    cJSON_AddStringToObject(pRoot,"next_level_flag",temp);
-    //下一阶段推荐级位
-    sprintf(temp,"%d",g_period_msg_to_app.next_work_level_recommend);
-    cJSON_AddStringToObject(pRoot,"next_level_output",temp);
-    //下一阶段生效倒计时
-    sprintf(temp,"%d",g_period_msg_to_app.next_recommend_countdown);
-    cJSON_AddStringToObject(pRoot,"next_recommend_countdown",temp);
-    //下一阶段生效剩余距离
-    sprintf(temp,"%d",g_period_msg_to_app.next_recommend_distance);
-    cJSON_AddStringToObject(pRoot,"next_recommend_distance",temp);
+    if (g_speed_plan_flag==1)
+    {
+        //下一阶段推荐速度
+        sprintf(temp,"%d",g_period_msg_to_app.next_speed_recommend);
+        cJSON_AddStringToObject(pRoot,"next_speed_recommend",temp);
+        //下一阶段推荐工况
+        sprintf(temp,"%d",g_period_msg_to_app.next_work_condition_recommend);
+        cJSON_AddStringToObject(pRoot,"next_level_flag",temp);
+        //下一阶段推荐级位
+        sprintf(temp,"%d",g_period_msg_to_app.next_work_level_recommend);
+        cJSON_AddStringToObject(pRoot,"next_level_output",temp);
+        //下一阶段生效倒计时
+        sprintf(temp,"%d",g_period_msg_to_app.next_recommend_countdown);
+        cJSON_AddStringToObject(pRoot,"next_recommend_countdown",temp);
+        //下一阶段生效剩余距离
+        sprintf(temp,"%d",g_period_msg_to_app.next_recommend_distance);
+        cJSON_AddStringToObject(pRoot,"next_recommend_distance",temp);
+    }
+    else
+    {
+        //下一阶段推荐速度
+        cJSON_AddStringToObject(pRoot,"next_speed_recommend","无效");
+        //下一阶段推荐工况
+        cJSON_AddStringToObject(pRoot,"next_level_flag","无效");
+        //下一阶段推荐级位
+        cJSON_AddStringToObject(pRoot,"next_level_output","无效");
+        //下一阶段生效倒计时
+        cJSON_AddStringToObject(pRoot,"next_recommend_countdown","无效");
+        //下一阶段生效剩余距离
+        cJSON_AddStringToObject(pRoot,"next_recommend_distance","无效");
+    }
+
     //临时限速数据
     pArray = cJSON_CreateArray();
     cJSON_AddItemToObject(pRoot,"temporary_info",pArray);
@@ -889,6 +906,64 @@ UINT16 PackTriggerJsonDataToApp(char* json_data)
         cJSON_AddStringToObject(pItem,"speed",temp);
         cJSON_AddItemToArray(pArray,pItem);
     }
+    char *szJSON = cJSON_Print(pRoot);
+    //printf("%s\n", szJSON);
+    memcpy(json_data,szJSON, strlen(szJSON));
+    length= strlen(szJSON);
+    free(szJSON);
+    return length;
+}
+
+/*************************************************************************
+* 功能描述: 打包发送给APP的位置确认数据
+        * 输入参数: 无
+        * 输出参数: 无
+        * 返回值: 无
+*************************************************************************/
+UINT16 PackLocationConfirmJsonDataToApp(char* json_data)
+{
+    UINT16 length=0;
+    cJSON* pRoot = cJSON_CreateObject();
+    cJSON* pArray;
+    cJSON* pItem;
+    char temp[50];
+    //消息标识
+    cJSON_AddStringToObject(pRoot,"msg_type","206");
+    //1.根据GPS计算最近车站
+    UINT16 station_index_gps=0;
+    double error_dis_gps=65535;
+    double lat = 1.0*g_period_msg_from_signal.latitude_value/100000;
+    double lng = 1.0*g_period_msg_from_signal.longitude_value/100000;
+    for(int i=0;i<g_static_data_csv.station_csv.length;i++)
+    {
+        double lat_temp=g_static_data_csv.station_csv.latitude[i];
+        double lng_temp=g_static_data_csv.station_csv.longitude[i];
+        error_dis_gps=GetDistanceByPoint(lat_temp,lng_temp,lat,lng);
+        if(error_dis_gps<DISTANCE_ERROR)
+        {
+            station_index_gps=i;
+            break;
+        }
+    }
+    if (station_index_gps!=0)
+    {
+        //当前站ID
+        sprintf(temp,"%d",g_static_data_csv.station_csv.station_id[station_index_gps]);
+        cJSON_AddStringToObject(pRoot,"current_station_id",temp);
+        //站名称
+        sprintf(temp,"%s",g_static_data_csv.station_csv.station_name[station_index_gps]);
+        cJSON_AddStringToObject(pRoot,"current_station_name",temp);
+    }
+    else
+    {
+        //当前站ID
+        sprintf(temp,"%d",0);
+        cJSON_AddStringToObject(pRoot,"current_station_id",temp);
+        //站名称
+        sprintf(temp,"%s","位置未知，当前GPS数据未查询到有效站点数据");
+        cJSON_AddStringToObject(pRoot,"current_station_name",temp);
+    }
+
     char *szJSON = cJSON_Print(pRoot);
     //printf("%s\n", szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
@@ -1049,7 +1124,7 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
 
                 break;
             case 105:
-                g_plan_config_info.plan_flag=1;//运行计划更新
+                g_plan_config_info.plan_refresh_flag=1;//运行计划更新
                 g_plan_config_info.train_id=(UINT32)cJSON_GetObjectItem(pRoot,"train_id")->valueint;
                 g_plan_config_info.direction=(UINT8)cJSON_GetObjectItem(pRoot,"direction")->valueint;
                 g_plan_config_info.plan_flag=(UINT8)cJSON_GetObjectItem(pRoot,"plan_flag")->valueint;
@@ -1065,6 +1140,14 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                     g_plan_config_info.plan_station_info[i].jump_flag=(UINT8)cJSON_GetObjectItem(array_item,"is_jump")->valueint;
                 }
                 printf("%s WEB SOCKET:receive message 105 from APP!\n",g_current_time);
+                length= PackLocationConfirmJsonDataToApp(send_buff);
+                result = ws_send(wsc->fd, send_buff, length, false, WDT_TXTDATA);
+                //发送失败,标记异常(后续会被自动回收)
+                if (result < 0)
+                    wsc->exitType = WET_SEND;
+                else
+                    printf("%s WEB SOCKET:send message 206 to APP success!\n",g_current_time);
+
                 break;
             default:
                 break;

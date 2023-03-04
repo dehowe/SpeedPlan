@@ -45,10 +45,12 @@ UINT16 remain_section_length;					// 区间进行等间隔离散后的剩余长�
 void SpeedPlanMain()
 {
     /*如果信号系统发送允许计划更新且无正在进行的曲线优任务*/
-    if(g_period_msg_from_signal.train_plan_flag==1&&g_speed_plan_info.optimize_stage==2)
+    if(g_period_msg_from_signal.door_flag==1&&g_speed_plan_info.optimize_stage==2&&g_period_msg_from_signal.next_station_id!=0)
     {
-        printf("receive plan change and optimize end!\n");
-        g_period_msg_from_signal.train_plan_flag=0;
+        g_speed_plan_flag=1;//已启动速度优化
+        printf("%s SPEED_PLAN:receive plan change and optimize end!\n",g_current_time);
+        LogWrite(INFO,"%s-%s",g_current_time,"SPEED_PLAN:receive plan change and optimize end!");
+
         //参数校验
         UINT8 data_error_flag=0;//数据异常标志 0：无异常 1：数据异常
         g_speed_plan_info.interval_begin_dis=g_period_msg_from_signal.train_distance;//区间起始位置为列车头部位置
@@ -64,53 +66,72 @@ void SpeedPlanMain()
                 break;
             }
         }
-        //printf("%d-%d\n",g_speed_plan_info.current_station_id,g_speed_plan_info.next_station_id);
-
-        for(int i=0;i<g_static_data_csv.station_csv.length;i++)
+        //
+        if(g_speed_plan_info.current_station_id==g_speed_plan_info.next_station_id)
         {
-            //if(strcmp(g_static_data_csv.station_csv.station_name[i],g_speed_plan_info.next_station_name)==0)
-            //从车站静态数据中找到下一站
-            if (g_static_data_csv.station_csv.station_id[i]==g_speed_plan_info.next_station_id)
-            {
-                g_speed_plan_info.interval_end_dis=g_static_data_csv.station_csv.begin_distance[i];//区间起结束位置为下一站公里标位置
-                //如果运行方向为下行
-                if(g_direction==DIRECTION_DOWN)
-                {
-                    if(g_speed_plan_info.interval_end_dis<g_speed_plan_info.interval_begin_dis)
-                    {
-                        data_error_flag=1;
-                        printf("SPEED_PLAN:error!");
-                        break;
-                    }
-                    if(i!=0)
-                    {
-                        g_speed_plan_info.target_time=(UINT32)g_static_data_csv.station_csv.schedule_time[i-1];
-                    }
-                    else
-                    {
-                        g_speed_plan_info.target_time=0;
-                        data_error_flag=1;
-                        printf("SPEED_PLAN:error!");
-                        break;
-                    }
-                }
-                else
-                {
-                    g_speed_plan_info.target_time=(UINT32)g_static_data_csv.station_csv.schedule_time[i];
-                    if(g_speed_plan_info.interval_end_dis>g_speed_plan_info.interval_begin_dis)
-                    {
-                        data_error_flag=1;
-                        printf("SPEED_PLAN:error!");
-                        break;
-                    }
-                }
-                break;
-            }
+            data_error_flag=1;
+            printf("SPEED_PLAN:error code 1!");
+            LogWrite(INFO,"%s","SPEED_PLAN:error code 1!");
+
         }
         //如果数据无异常
         if (data_error_flag==0)
         {
-            printf("speed plan thread on!\n");
+            //printf("%d-%d\n",g_speed_plan_info.current_station_id,g_speed_plan_info.next_station_id);
+
+            for(int i=0;i<g_static_data_csv.station_csv.length;i++)
+            {
+                //if(strcmp(g_static_data_csv.station_csv.station_name[i],g_speed_plan_info.next_station_name)==0)
+                //从车站静态数据中找到下一站
+                if (g_static_data_csv.station_csv.station_id[i]==g_speed_plan_info.next_station_id)
+                {
+                    g_speed_plan_info.interval_end_dis=g_static_data_csv.station_csv.begin_distance[i];//区间起结束位置为下一站公里标位置
+                    //如果运行方向为下行
+                    if(g_direction==DIRECTION_DOWN)
+                    {
+                        if(g_speed_plan_info.interval_end_dis<g_speed_plan_info.interval_begin_dis)
+                        {
+                            data_error_flag=1;
+                            printf("SPEED_PLAN:error code 2!");
+                            LogWrite(INFO,"%s","SPEED_PLAN:error code 2!");
+                            break;
+                        }
+                        if(i!=0)
+                        {
+                            g_speed_plan_info.target_time=(UINT32)g_static_data_csv.station_csv.schedule_time[i-1];
+                        }
+                        else
+                        {
+                            g_speed_plan_info.target_time=0;
+                            data_error_flag=1;
+                            printf("SPEED_PLAN:error code 3!");
+                            LogWrite(INFO,"%s","SPEED_PLAN:error code 3!");
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        g_speed_plan_info.target_time=(UINT32)g_static_data_csv.station_csv.schedule_time[i];
+                        if(g_speed_plan_info.interval_end_dis>g_speed_plan_info.interval_begin_dis)
+                        {
+                            data_error_flag=1;
+                            printf("SPEED_PLAN:error code 4!");
+                            LogWrite(INFO,"%s","SPEED_PLAN:error code 4!");
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+
+        }
+
+        //如果数据无异常
+        if (data_error_flag==0)
+        {
+            printf("%s SPEED_PLAN:speed plan thread on!\n",g_current_time);
+            LogWrite(INFO,"%s-%s",g_current_time,"SPEED_PLAN:speed plan thread on!");
+
             g_speed_plan_info.optimize_stage=1;//曲线优化标志置为：正在曲线优化中
             pthread_t tid_speed_plan;
             /*创建曲线优化线程*/

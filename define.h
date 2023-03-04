@@ -1,6 +1,7 @@
 #pragma once
 #include <string.h>
 #include "stdio.h"
+#define _XOPEN_SOURCE
 #include <time.h>
 /*基本数据类型定义*/
 typedef char                CHAR;
@@ -37,7 +38,12 @@ typedef long int            INT64;
 #define DIRECTION_UP                1               // 上行方向
 #define DIRECTION_DOWN              0               // 下行方向
 #define MAX_DEVICE_NUM              50              // 白名单设备最大数量
-
+#define PI                          3.1415926       // pai
+#define EARTH_RADIUS                6378.137        // 地球半径
+#define PERIOD                      0.2             // 计算周期 s
+#define SPEED_MODE                  0               // 速度模式
+#define LEVEL_MODE                  1               // 级位模式
+#define DISTANCE_ERROR              200             // 允许的定位误差 m
 #pragma region 曲线优化所需数据结构体定义
 /*列车参数结构体*/
 typedef struct
@@ -152,6 +158,10 @@ typedef struct
     FLOAT32 operation_energy[MAX_STATION_NUM];  /*实际运行能耗 kwh*/
     UINT32 begin_distance[MAX_STATION_NUM];  /*起始公里标 m*/
     UINT32 end_distance[MAX_STATION_NUM];    /*结束公里标 m*/
+    FLOAT32 latitude[MAX_STATION_NUM];       /*纬度*/
+    UINT16 latitude_dir[MAX_STATION_NUM];    /*纬度方向*/
+    FLOAT32 longitude[MAX_STATION_NUM];       /*经度*/
+    UINT16 longitude_dir[MAX_STATION_NUM];    /*经度方向*/
 }STATION_CSV;
 
 /*线路限速静态数据*/
@@ -294,19 +304,52 @@ typedef struct
 
 #pragma region 通信协议结构体
 
+//网卡信息结构体1
+typedef struct {
+    int  sum_n;
+    char net_name1[20];
+    char net_name2[20];
+    char net_name3[20];
+    char net_name4[20];
+    char net_name5[20];
+    char net_ip1[16];
+    char net_ip2[16];
+    char net_ip3[16];
+    char net_ip4[16];
+    char net_ip5[16];
+    char net_mac1[32];
+    char net_mac2[32];
+    char net_mac3[32];
+    char net_mac4[32];
+    char net_mac5[32];
+}net_iface;
+
+//网卡信息结构体2
+typedef struct  {
+    struct net_iface_1 *next; //指向下一个网卡信息结构体的地址
+    char net_name[20];          //网卡名字
+    char net_ip[16];            //网卡IP
+}net_iface_1;
+
 /*车辆网络->主设备周期数据结构体*/
 typedef struct
 {
     UINT16 train_weight;         /*列车实时载荷 t*/
     UINT8 formation_num;         /*编组数量*/
     UINT16 train_length;         /*列车长度 m*/
-    UINT32 traction_voltage;     /*列车牵引机组输入电压 V*/
-    UINT32 traction_voltage_side; /*列车牵引机组输入电压 副边 V*/
-    UINT32 traction_current;     /*列车牵引机组输入电流 A*/
+    UINT16 traction_voltage_2;     /*2车牵引机组输入电压 V*/
+    UINT16 traction_voltage_3;          /*3车牵引机组输入电压 V*/
+    UINT16 traction_voltage_side_2;     /*2车牵引机组输入电压 副边 V*/
+    UINT16 traction_voltage_side_3;     /*3车牵引机组输入电压 副边 V*/
+    UINT16 traction_current_2;          /*2车牵引机组输入电流 A*/
+    UINT16 traction_current_3;          /*3车牵引机组输入电流 A*/
+    UINT16 traction_current_low_2;     /*2车牵引机组输入低压侧电流 A*/
+    UINT16 traction_current_low_3;     /*3车牵引机组输入低压侧电流 A*/
     UINT8 traction_current_sign; /*电流符号 1：正值 2：负值*/
     UINT8 traction_fault_flag;   /*列车牵引故障标志位*/
     UINT8 brake_fault_flag;      /*列车制动故障标志位*/
     UINT8 other_fault_flag;      /*列车其他故障标志位*/
+    UINT16 train_fault_code;     /*列车故障代码*/
     //自更新变量
     UINT32 traction_energy_sum;          /*累计牵引能耗 焦耳*/
     UINT32 brake_energy_sum;             /*累计再生能量 焦耳*/
@@ -322,18 +365,33 @@ typedef struct
     UINT32 train_number;         /*列车车组号*/
     UINT8 arrive_flag;           /*停准停稳标志 1:停准停稳 0:其他*/
     UINT8 leave_flag;            /*允许发车标志 1:允许发车 0:其他*/
+    /*bit*/
+    UINT8 byte_data;             /*包含以下bit数据的byte*/
+    UINT8 handle_brake_flag;     /*手柄制动区*/
+    UINT8 handle_traction_flag;  /*手柄牵引区*/
     UINT8 door_flag;             /*列车车门标志 1：锁闭 0：开启*/
+    UINT8 door_flag_last;        /*上周期列车车门标志 1：锁闭 0：开启*/
+    UINT8 control_mode_flag;     /*0:*/
+    UINT8 pantograph_3_flag;     /*3车受电弓状态*/
+    UINT8 pantograph_2_flag;     /*2车受电弓状态*/
+    UINT8 vcb_3_flag;            /*3车vcb状态*/
+    UINT8 vcb_2_flag;            /*2车vcb状态*/
+    /**/
     UINT8 train_plan_flag;       /*列车运行计划变更标志 1:计划变更 0:其他*/
     UINT16 train_ebi;            /*ATP防护速度 km/h*/
-    UINT16 train_speed;          /*列车速度 km/h*/
+    FLOAT32 train_speed;          /*列车速度 km/h*/
     UINT16 next_station_id;      /*下一站编号*/
     UINT8 current_station_leave_time[20];   /*当前站出发时间*/
-    UINT8 next_staion_name[20];  /*下一站名称*/
+    CHAR current_station_name[100];  /*当前站名称*/
+    CHAR next_station_name[100];  /*下一站名称*/
+    CHAR dst_station_name[100];  /*终点站名称*/
     UINT8 next_station_arrive_time[20];  /*下一站到达时间*/
     UINT8 next_station_leave_time[20];   /*下一站出发时间*/
-    UINT8 train_work_condition;          /*列车工况 1:牵引 2:巡航 3:惰行 4:制动 5:无效*/
-    UINT8 train_work_level;              /*列车级位 0-100*/
+    UINT8 train_work_condition;            /*列车工况 1:牵引  2:惰行 3:制动 4:无效*/
+    UINT16 train_work_level;              /*列车级位 级位模式有效*/
+    UINT16 train_work_speed;              /*目标速度km/h 速度模式有效*/
     UINT32 train_distance;               /*列车公里标 m*/
+    FLOAT64 train_distance_double;
     UINT8 train_time[20];                /*列车时间*/
     UINT16 temporary_limit_num;           /*临时限速数量*/
     UINT32 temporary_limit_begin_distance[MAX_TEMPORARY_LIMIT_NUM]; /*临时限速起始公里标 m*/
@@ -345,7 +403,11 @@ typedef struct
     UINT8 latitude_direction;       /*纬度方向*/
     //自更新变量
     UINT32 train_distance_last;          /*上周期列车公里标 m*/
-
+    UINT32 longitude_value_last;        /*上周期经度值*/
+    UINT8 longitude_direction_last;      /*上周期经度方向*/
+    UINT32 latitude_value_last;         /*上周期纬度值*/
+    UINT8 latitude_direction_last;       /*上周期纬度方向*/
+    FLOAT32 train_speed_last;            /*上周期列车速度 km/h*/
 }PERIOD_MSG_FROM_SIGNAL;
 
 /*主设备->APP初始化数据结构体*/

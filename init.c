@@ -44,6 +44,18 @@ void FillStationData(char *data,UINT16 row_index,UINT16 column_index)
         case 10:
             g_static_data_csv.station_csv.end_distance[row_index] = (FLOAT32)atof(data);
             break;
+        case 11:
+            g_static_data_csv.station_csv.latitude[row_index] = (FLOAT32)atof(data);
+            break;
+        case 12:
+            g_static_data_csv.station_csv.latitude_dir[row_index] = (UINT16)atoi(data);
+            break;
+        case 13:
+            g_static_data_csv.station_csv.longitude[row_index] = (FLOAT32)atof(data);
+            break;
+        case 14:
+            g_static_data_csv.station_csv.longitude_dir[row_index] = (UINT16)atoi(data);
+            break;
         default:
             break;
     }
@@ -834,6 +846,28 @@ UINT8 LineStaticDataInit()
 }
 
 /*************************************************************************
+ * 功能描述: 运行计划数据初始化
+ * 输入参数: 无
+ * 输出参数: 无
+ * 返回值:   UINT8   1:成功 0：失败
+ *************************************************************************/
+UINT8 StationPlanDataInit()
+{
+    UINT8 result;
+    g_plan_config_info.plan_refresh_flag=1;
+    g_plan_config_info.direction=DIRECTION_DOWN;
+    g_plan_config_info.plan_station_num=9;
+    for (int i = 0; i < g_plan_config_info.plan_station_num; i++)
+    {
+        g_plan_config_info.plan_station_info[i].station_id=g_static_data_csv.station_csv.station_id[i];
+        g_plan_config_info.plan_station_info[i].jump_flag=0;
+        g_plan_config_info.plan_station_info[i].distance=g_static_data_csv.station_csv.begin_distance[i];
+    }
+    result=1;
+    return result;
+}
+
+/*************************************************************************
  * 功能描述: 初始化线路静态数据、列车静态数据
  * 输入参数: 无
  * 输出参数: 无
@@ -848,6 +882,10 @@ UINT8 StaticDataInit()
         return result;
     /*初始化线路数据*/
     result=LineStaticDataInit();
+    if(result==0)
+        return result;
+    /*初始化运行计划配置*/
+    result=StationPlanDataInit();
     if(result==0)
         return result;
     return result;
@@ -1079,4 +1117,334 @@ UINT8 DeviceMacDataInit()
         memcpy(g_device_mac_data.device_mac_list[i],DATA[i],30);
     }
 }
+
+
+/**
+ * @brief get_iface_name 获取网口名字
+ * @param get_iface      OUT 结构体
+ * @return               成功返回1 错误返回负数
+ */
+int get_iface_name(net_iface *get_iface)
+{
+    int sock_get_iface;
+    struct ifconf ifc_get_iface;
+    struct ifreq *ifr_get_iface;
+    //初始化 ifconf
+    char buf[512];
+    ifc_get_iface.ifc_len = 512;
+    ifc_get_iface.ifc_buf = buf;
+    memset(get_iface,0,sizeof(net_iface));
+
+    sock_get_iface = socket(AF_INET,SOCK_DGRAM,0);
+    if(sock_get_iface < 0) {
+        perror("SOCKET:");
+        return -1;
+    }
+    if(ioctl(sock_get_iface ,SIOCGIFCONF,&ifc_get_iface) < 0) {
+        perror("ioctl");
+        return -1;
+    }
+    ifr_get_iface = (struct ifreq*)buf;
+    get_iface->sum_n = ifc_get_iface.ifc_len/sizeof(struct ifreq);
+    int control_n = 1;
+    for(int i = (ifc_get_iface.ifc_len/sizeof(struct ifreq)); i > 0; i--) {
+        if(strcmp(inet_ntoa(((struct sockaddr_in*)&(ifr_get_iface->ifr_addr))->sin_addr),"127.0.0.1") == 0) {
+            ifr_get_iface++;
+            get_iface->sum_n--;
+            continue;
+        }
+        else {
+            switch (control_n) {
+                case 1:
+                    strcpy(get_iface->net_name1,ifr_get_iface->ifr_name);
+                    strcpy(get_iface->net_ip1,inet_ntoa(((struct sockaddr_in*)&(ifr_get_iface->ifr_addr))->sin_addr));
+                    break;
+                case 2:
+                    strcpy(get_iface->net_name2,ifr_get_iface->ifr_name);
+                    strcpy(get_iface->net_ip2,inet_ntoa(((struct sockaddr_in*)&(ifr_get_iface->ifr_addr))->sin_addr));
+                    break;
+                case 3:
+                    strcpy(get_iface->net_name3,ifr_get_iface->ifr_name);
+                    strcpy(get_iface->net_ip3,inet_ntoa(((struct sockaddr_in*)&(ifr_get_iface->ifr_addr))->sin_addr));
+                    break;
+                case 4:
+                    strcpy(get_iface->net_name4,ifr_get_iface->ifr_name);
+                    strcpy(get_iface->net_ip4,inet_ntoa(((struct sockaddr_in*)&(ifr_get_iface->ifr_addr))->sin_addr));
+                    break;
+                case 5:
+                    strcpy(get_iface->net_name5,ifr_get_iface->ifr_name);
+                    strcpy(get_iface->net_ip5,inet_ntoa(((struct sockaddr_in*)&(ifr_get_iface->ifr_addr))->sin_addr));
+                    break;
+                default:
+                    break;
+            }
+        }
+        control_n++;
+        ifr_get_iface++;
+    }
+    close(sock_get_iface);
+    return 1;
+}
+
+/**
+ * @brief getNetMac         获取Linux下的所有网卡MAC序列号(最多五个网卡设备)
+ * @param get_iface         存储网卡信息的结构体
+ * @return                  0：获取成功  其他返回值：获取失败
+*/
+UINT8 getNetMac(net_iface *get_iface)
+{
+    int i = 0;
+    int sock;
+    get_iface_name(get_iface);
+    //printf("get_iface->sum_n: %d\n",get_iface->sum_n);
+    for(i=1;i<=get_iface->sum_n;i++) {
+        switch(i) {
+            case 1:
+                if((sock = socket(AF_INET,SOCK_STREAM,0))<0) {
+                    perror("socket");
+                    return 2;
+                }
+                struct ifreq ifreq1;
+                strcpy(ifreq1.ifr_name,get_iface->net_name1);
+                printf("%s ",ifreq1.ifr_name);
+                if(ioctl(sock,SIOCGIFHWADDR,&ifreq1)<0) {
+                    perror("ioctl ");
+                    return 3;
+                }
+                sprintf(get_iface->net_mac1,"%02x:%02x:%02x:%02x:%02x:%02x",
+                        (unsigned char)ifreq1.ifr_hwaddr.sa_data[0],
+                        (unsigned char)ifreq1.ifr_hwaddr.sa_data[1],
+                        (unsigned char)ifreq1.ifr_hwaddr.sa_data[2],
+                        (unsigned char)ifreq1.ifr_hwaddr.sa_data[3],
+                        (unsigned char)ifreq1.ifr_hwaddr.sa_data[4],
+                        (unsigned char)ifreq1.ifr_hwaddr.sa_data[5]);
+                printf("MAC1: %s\n",get_iface->net_mac1);
+                close(sock);
+                break;
+            case 2:
+                if((sock = socket(AF_INET,SOCK_STREAM,0))<0) {
+                    perror("socket");
+                    return 2;
+                }
+                struct ifreq ifreq2;
+                strcpy(ifreq2.ifr_name,get_iface->net_name2);
+                printf("%s ",ifreq2.ifr_name);
+                if(ioctl(sock,SIOCGIFHWADDR,&ifreq2)<0) {
+                    perror("ioctl ");
+                    return 3;
+                }
+                sprintf(get_iface->net_mac2,"%02x:%02x:%02x:%02x:%02x:%02x",
+                        (unsigned char)ifreq2.ifr_hwaddr.sa_data[0],
+                        (unsigned char)ifreq2.ifr_hwaddr.sa_data[1],
+                        (unsigned char)ifreq2.ifr_hwaddr.sa_data[2],
+                        (unsigned char)ifreq2.ifr_hwaddr.sa_data[3],
+                        (unsigned char)ifreq2.ifr_hwaddr.sa_data[4],
+                        (unsigned char)ifreq2.ifr_hwaddr.sa_data[5]);
+                printf("MAC2: %s\n",get_iface->net_mac2);
+                close(sock);
+                break;
+            case 3:
+                if((sock = socket(AF_INET,SOCK_STREAM,0))<0) {
+                    perror("socket");
+                    return 2;
+                }
+                struct ifreq ifreq3;
+                strcpy(ifreq3.ifr_name,get_iface->net_name3);
+                printf("%s ",ifreq3.ifr_name);
+                if(ioctl(sock,SIOCGIFHWADDR,&ifreq3)<0) {
+                    perror("ioctl ");
+                    return 3;
+                }
+                sprintf(get_iface->net_mac3,"%02x:%02x:%02x:%02x:%02x:%02x",
+                        (unsigned char)ifreq3.ifr_hwaddr.sa_data[0],
+                        (unsigned char)ifreq3.ifr_hwaddr.sa_data[1],
+                        (unsigned char)ifreq3.ifr_hwaddr.sa_data[2],
+                        (unsigned char)ifreq3.ifr_hwaddr.sa_data[3],
+                        (unsigned char)ifreq3.ifr_hwaddr.sa_data[4],
+                        (unsigned char)ifreq3.ifr_hwaddr.sa_data[5]);
+                printf("MAC3: %s\n",get_iface->net_mac3);
+                close(sock);
+                break;
+            case 4:
+                if((sock = socket(AF_INET,SOCK_STREAM,0))<0) {
+                    perror("socket");
+                    return 2;
+                }
+                struct ifreq ifreq4;
+                strcpy(ifreq4.ifr_name,get_iface->net_name4);
+                printf("%s ",ifreq4.ifr_name);
+                if(ioctl(sock,SIOCGIFHWADDR,&ifreq4)<0) {
+                    perror("ioctl ");
+                    return 3;
+                }
+                sprintf(get_iface->net_mac4,"%02x:%02x:%02x:%02x:%02x:%02x",
+                        (unsigned char)ifreq4.ifr_hwaddr.sa_data[0],
+                        (unsigned char)ifreq4.ifr_hwaddr.sa_data[1],
+                        (unsigned char)ifreq4.ifr_hwaddr.sa_data[2],
+                        (unsigned char)ifreq4.ifr_hwaddr.sa_data[3],
+                        (unsigned char)ifreq4.ifr_hwaddr.sa_data[4],
+                        (unsigned char)ifreq4.ifr_hwaddr.sa_data[5]);
+                printf("MAC4: %s\n",get_iface->net_mac4);
+                close(sock);
+                break;
+            case 5:
+                if((sock = socket(AF_INET,SOCK_STREAM,0))<0) {
+                    perror("socket");
+                    return 2;
+                }
+                struct ifreq ifreq5;
+                strcpy(ifreq5.ifr_name,get_iface->net_name5);
+                printf("%s ",ifreq5.ifr_name);
+                if(ioctl(sock,SIOCGIFHWADDR,&ifreq5)<0) {
+                    perror("ioctl ");
+                    return 3;
+                }
+                sprintf(get_iface->net_mac5,"%02x:%02x:%02x:%02x:%02x:%02x",
+                        (unsigned char)ifreq5.ifr_hwaddr.sa_data[0],
+                        (unsigned char)ifreq5.ifr_hwaddr.sa_data[1],
+                        (unsigned char)ifreq5.ifr_hwaddr.sa_data[2],
+                        (unsigned char)ifreq5.ifr_hwaddr.sa_data[3],
+                        (unsigned char)ifreq5.ifr_hwaddr.sa_data[4],
+                        (unsigned char)ifreq5.ifr_hwaddr.sa_data[5]);
+                printf("MAC5: %s\n",get_iface->net_mac5);
+                close(sock);
+                break;
+        }
+    }
+    return 1;
+}
+
+/**
+ * @brief check_nic    检测网卡是否已经插上网线
+ * @param eth_name     IN 网卡名字
+ * @return             0：网卡已插上网线   -1：网卡未插上网线      其他返回值：错误
+ */
+int check_nic(const char *net_name)
+{
+    struct ifreq ifr;
+    int skfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(skfd < 0) {
+        printf("socket error: %s [%s]\n", strerror(errno), __FUNCTION__);
+        return -2;
+    }
+    strcpy(ifr.ifr_name, net_name);
+    if(ioctl(skfd, SIOCGIFFLAGS, &ifr) < 0) {
+        close(skfd);
+        return -3;
+    }
+    if(ifr.ifr_flags & IFF_RUNNING) {
+        close(skfd);
+        return 0; //网卡已插上网线
+    }
+    else {
+        close(skfd);
+        return -1;
+    }
+}
+
+/**
+ * @brief get_iface_info	   获取本地所有网卡名字和IP
+ * @param netIface             网卡信息结构体指针，用户自行分配存储空间
+ * @param outBuffLen           netIface分配的存储空间大小，若与实际获取到的数据总大小不一致，则将实际的总大小返回
+ * @return                     0：成功
+ *                             1：outBuffLen与实际获取到的数据总大小不一致，将实际的大小赋值给outBuffLen并返回
+ *                             -1：错误
+ * 使用步骤注意：
+ * 1、malloc申请 netIface 堆内存空间，初始化 outBuffLen 变量的值
+ * 2、调用一次该函数，目的是确定实际outBuffLen的大小
+ * 3、判断返回值，如果返回1，则释放netIface堆内存空间，根据outBuffLen的大小重新分配堆内存空间；
+ *    如果返回0，证明获取网卡信息成功，直接跳过第3、4步
+ * 4、再一次调用该函数，若成功返回，则网卡信息获取完成
+ * 5、遍历获取网卡信息，根据结构体的 next 指针即可遍历指向下一个网卡信息的地址，直到 next 为空
+ */
+//int get_iface_info(net_iface_1 *netIface, unsigned int *outBuffLen)
+//{
+//    int sock_get_iface;
+//    struct ifconf ifc_get_iface;
+//    struct ifreq *ifr_get_iface;
+//    //初始化 ifconf
+//    char buf[512];
+//    ifc_get_iface.ifc_len = 512;
+//    ifc_get_iface.ifc_buf = buf;
+//
+//    sock_get_iface = socket(AF_INET,SOCK_DGRAM,0);
+//    if(sock_get_iface < 0) {
+//        perror("SOCKET:");
+//        return -1;
+//    }
+//    if(ioctl(sock_get_iface ,SIOCGIFCONF,&ifc_get_iface) < 0) {
+//        perror("ioctl");
+//        return -1;
+//    }
+//    unsigned int num = (ifc_get_iface.ifc_len/sizeof(struct ifreq)); //网卡个数
+//    if(*outBuffLen != num * sizeof(net_iface_1)) {
+//        *outBuffLen = num * sizeof(net_iface_1);
+//        return 1;
+//    }
+//    memset(netIface, 0, *outBuffLen);
+//    ifr_get_iface = (struct ifreq*)buf;
+//    for(unsigned int i=0; i<num; i++) {
+//        strcpy(netIface[i].net_name, ifr_get_iface->ifr_name);
+//        strcpy(netIface[i].net_ip, inet_ntoa(((struct sockaddr_in*)&(ifr_get_iface->ifr_addr))->sin_addr));
+//        if(i == num - 1) {
+//            netIface[i].next = NULL;
+//        }
+//        else {
+//            netIface[i].next = netIface + (i + 1);
+//        }
+//        ifr_get_iface++;
+//    }
+//    close(sock_get_iface);
+//    return 0;
+//}
+
+/*************************************************************************
+ * 功能描述: 检查输入的mac地址是否为本地mac
+ * 输入参数: 无
+ * 输出参数: 无
+ * 返回值:   UINT8   1:成功 0：失败
+ *************************************************************************/
+UINT8 CheckLocMac(CHAR* mac_loc)
+{
+    UINT8 result=0;
+    UINT8 result_net=0;
+    net_iface net_config;
+    result_net=getNetMac(&net_config);//获取本地NET配置
+    if(result_net==1)
+    {
+        if(strcmp(mac_loc,net_config.net_mac1)==0)
+        {
+            result=1;
+            return result;
+        }
+        if(strcmp(mac_loc,net_config.net_mac2)==0)
+        {
+            result=1;
+            return result;
+        }
+        if(strcmp(mac_loc,net_config.net_mac3)==0)
+        {
+            result=1;
+            return result;
+        }
+        if(strcmp(mac_loc,net_config.net_mac4)==0)
+        {
+            result=1;
+            return result;
+        }
+        if(strcmp(mac_loc,net_config.net_mac5)==0)
+        {
+            result=1;
+            return result;
+        }
+        printf("Cannot find mac address!!\n");
+    }
+    else
+    {
+        printf("Read net mac error!\n");
+    }
+
+    return result;
+}
+
 #pragma endregion

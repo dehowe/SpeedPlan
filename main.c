@@ -12,36 +12,64 @@ int main()
 {
     UINT8 result;
     printf("Hello ARM!\n");
-//    LogWrite(INFO,"%s","Hello World!");
-//    LogWrite(DEBUG,"%s","H.e.l.l.o W.o.r.l.d!");
-//    LogWrite(WARN,"%s","H e l l o W o r l d!");
-//    LogWrite(ERROR,"%s","Hallo World!");
 
+//    long debug=DateToTimeStamp("2022-12-28 23:08:18");
+//    double lat_last=39.997392;
+//    double lng_last=116.512808;
+//    double lat=39.997675;
+//    double lng=116.513062;
+//
+//
+//    double res=GetDistanceByPoint(lat_last,lng_last,lat,lng);
+//    double test=(lng_last-lng)/9281.2+lng_last;
+//    double res_test=GetDistanceByPoint(lat_last,lng_last,lat,test);
+
+//      UINT8 data[6]={23,5,25,18,30,30};
+//      char date[20];
+//      GetDateFromChar(data,date);
+
+//    char src[4096] = "\xc4\xe3\xba\xc3";
+//    //注意：此处写为char src[4096] = "ccb7bfad";将不会被转换，因为系统认为是英文字母、而不是gbk的内码！
+//    char dst[4096];
+//    int srclen = 4096;
+//    int dstlen = 4096;
+//    int ret = CodeConvertGBKToUTF8(src,srclen,dst,dstlen);
+//    printf("TK--------->>>>ret is %d\nsrc is %s\ndst is %s\n",ret,src,dst);
+
+
+    char net_mac_loc[32]="e0:38:2d:4f:ff:ff";  //本地 00:0c:29:7b:87:2c  融创 00:04:9f:04:d2:35
+
+    result=CheckLocMac(net_mac_loc);
+    if (result==0)
+    {
+        printf("Fail to init MAC address");
+        LogWrite(INFO,"%s","Fail to init MAC address");
+        return 0;
+    }
 
     result=StaticDataRead();
     if (result==0)
     {
         printf("Fail to read CSV files\n");
+        LogWrite(INFO,"%s","Fail to read CSV files");
         return 0;
     }
     result=StaticDataInit();
     if (result==0)
     {
         printf("Fail to initialize static data\n");
+        LogWrite(INFO,"%s","Fail to initialize static data");
         return 0;
     }
     DeviceMacDataInit();
     if (result==0)
     {
         printf("Fail to initialize device mac data\n");
+        LogWrite(INFO,"%s","Fail to initialize device mac data");
         return 0;
     }
-    g_speed_plan_info.optimize_stage=2;
-//    g_period_msg_from_signal.train_direction=1;
-//    g_period_msg_from_signal.train_plan_flag=1;
-//    g_period_msg_from_signal.train_distance=4280;
-//    g_period_msg_from_signal.next_station_id=1;
-    g_aw_id = 0;
+    ProgramInit();//程序初始化，变量初始化
+
     printf("CAN init...\n");
     /*CAN通信初始化*/
     result = Rce04aCanInit(CAN0_BITRATE, CAN0_NAME, Can0Filter, FILTER0_NUM);
@@ -53,6 +81,7 @@ int main()
         if(pthread_create(&tid_can,NULL,Rce04aCanMsgThread,NULL))
         {
             perror("Fail to create CAN thread");
+            LogWrite(INFO,"%s","Fail to create CAN thread");
         }
     }
     printf("SOCKET init...\n");
@@ -63,6 +92,7 @@ int main()
     if(pthread_create(&tid_server,NULL,socket_manager,NULL))
     {
         perror("Fail to create socket server thread");
+        LogWrite(INFO,"%s","Fail to create socket server thread");
     }
     printf("WEB SOCKET init...\n");
     pthread_t tid_webserver;
@@ -70,6 +100,7 @@ int main()
     if(pthread_create(&tid_webserver,NULL,WebSocketServer,NULL))
     {
         perror("Fail to create web socket server thread");
+        LogWrite(INFO,"%s","Fail to create web socket server thread");
     }
 
 

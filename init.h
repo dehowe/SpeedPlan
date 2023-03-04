@@ -3,7 +3,18 @@
 #include "stdio.h"
 #include "define.h"
 #include "SpeedPlan.h"
-
+#include "linux/hdreg.h"
+#include "fcntl.h"
+#include "stdlib.h"
+#include "ctype.h"
+#include "sys/socket.h"
+#include "netinet/in.h"
+#include "net/if.h"
+#include "unistd.h"
+#include "sys/io.h"
+#include "arpa/inet.h"
+#include "string.h"
+#include "sys/ioctl.h"
 
 /*************************************************************************
  * 功能描述: 读取CSV静态数据文件
@@ -57,3 +68,11 @@ UINT16 GetSpeedLimit(UINT32 train_head_loc,UINT32 train_tail_loc);
  * 返回值:   UINT8   1:初始化成功 0：初始化失败
  *************************************************************************/
 UINT8 DeviceMacDataInit();
+
+/*************************************************************************
+ * 功能描述: 检查输入的mac地址是否为本地mac
+ * 输入参数: 无
+ * 输出参数: 无
+ * 返回值:   UINT8   1:成功 0：失败
+ *************************************************************************/
+UINT8 CheckLocMac(CHAR* mac_loc);
