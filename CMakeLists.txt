@@ -3,5 +3,5 @@ project(API1_0 C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(API1_0 main.c SpeedPlan.c SpeedPlan.h define.h log.c log.h socket.c socket.h init.c init.h WebServer.c WebServer.h WebCom.c WebCom.h cJSON.c cJSON.h can.c can.h)
+add_executable(API1_0 main.c SpeedPlan.c SpeedPlan.h define.h log.c log.h socket.c socket.h init.c init.h WebServer.c WebServer.h WebCom.c WebCom.h cJSON.c cJSON.h can.c can.h led.c led.h)
 target_link_libraries(API1_0 m pthread)

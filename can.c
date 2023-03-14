@@ -763,6 +763,7 @@ void Rce04aCanReadMsgPoll(void)
             UnpackePeriodMsgFromCAN(recvbuf,frame_index*8);
             frame_index=0;
             memset(recvbuf,0,sizeof(recvbuf));
+            LightChangeLed2();//led2
         }
 
 //        Frame.can_id = 0x01;

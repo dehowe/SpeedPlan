@@ -12,34 +12,10 @@ int main()
 {
     UINT8 result;
     printf("Hello ARM!\n");
-
-//    long debug=DateToTimeStamp("2022-12-28 23:08:18");
-//    double lat_last=39.997392;
-//    double lng_last=116.512808;
-//    double lat=39.997675;
-//    double lng=116.513062;
-//
-//
-//    double res=GetDistanceByPoint(lat_last,lng_last,lat,lng);
-//    double test=(lng_last-lng)/9281.2+lng_last;
-//    double res_test=GetDistanceByPoint(lat_last,lng_last,lat,test);
-
-//      UINT8 data[6]={23,5,25,18,30,30};
-//      char date[20];
-//      GetDateFromChar(data,date);
-
-//    char src[4096] = "\xc4\xe3\xba\xc3";
-//    //注意：此处写为char src[4096] = "ccb7bfad";将不会被转换，因为系统认为是英文字母、而不是gbk的内码！
-//    char dst[4096];
-//    int srclen = 4096;
-//    int dstlen = 4096;
-//    int ret = CodeConvertGBKToUTF8(src,srclen,dst,dstlen);
-//    printf("TK--------->>>>ret is %d\nsrc is %s\ndst is %s\n",ret,src,dst);
-
-
-    char net_mac_loc[32]="e0:38:2d:4f:ff:ff";  //本地 00:0c:29:7b:87:2c  融创 00:04:9f:04:d2:35
-
-    result=CheckLocMac(net_mac_loc);
+    char net_mac_loc[32]="00:04:9f:04:d2:35";  //唯一绑定MAC地址 本地 00:0c:29:7b:87:2c  融创 00:04:9f:04:d2:35 实验室 00:04:9f:04:d2:35
+    Rce04aLedEncoderInit();//led初始化
+    LightUpLed1();//点亮led1
+    result=CheckLocMac(net_mac_loc);//检查MAC地址有效性
     if (result==0)
     {
         printf("Fail to init MAC address");
@@ -107,7 +83,7 @@ int main()
     while (1)
     {
         SpeedPlanMain();
-
+        LightChangeLed1();//led1闪烁
         sleep(1);
     }
 

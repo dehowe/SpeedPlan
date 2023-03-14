@@ -523,6 +523,7 @@ void *WebSocketServer()
     {
         //200ms周期
         ws_delayms(200);
+        LightChangeLed3();//led3闪烁
         //打包200ms周期数据
         length=PackPeriodJsonDataToApp(send_buff);
         //每200ms推送信息给所有客户端
@@ -960,12 +961,12 @@ UINT16 PackLocationConfirmJsonDataToApp(char* json_data)
         sprintf(temp,"%d",0);
         cJSON_AddStringToObject(pRoot,"current_station_id",temp);
         //站名称
-        sprintf(temp,"%s","位置未知，当前GPS数据未查询到有效站点数据");
+        sprintf(temp,"%s","Location unknown");
         cJSON_AddStringToObject(pRoot,"current_station_name",temp);
     }
 
     char *szJSON = cJSON_Print(pRoot);
-    //printf("%s\n", szJSON);
+//    printf("%s\n", szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
     length= strlen(szJSON);
     free(szJSON);
@@ -1057,6 +1058,8 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
     cJSON* pRoot;
     char send_buff[1024*10];
     pRoot= cJSON_Parse(receive_buff);
+//    char *debug = cJSON_Print(pRoot);
+//    printf("%s\n", debug);
     message_id= (UINT16)cJSON_GetObjectItem(pRoot,"msg_type")->valueint;
     device_mac=cJSON_GetObjectItem(pRoot,"device_id")->valuestring;
     result=CheckDeviceMacValidity(device_mac);

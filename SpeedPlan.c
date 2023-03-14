@@ -152,6 +152,7 @@ void SpeedPlanMain()
 *************************************************************************/
 void *SpeedPlanOffline()
 {
+    LightUpLed4();//led4点亮
     UINT32 start = clock();
     //基础数据预处理
     gradient = (FLOAT32*)malloc(MAX_INTERVAL_SAMPLING * sizeof(FLOAT32));				// 初始化区间坡度存储指针;
@@ -211,6 +212,7 @@ void *SpeedPlanOffline()
     free(speed_limit_mmax);
     free(level_output_flag);
     free(plan_time);
+    LightDownLed4();//led4熄灭
     pthread_exit(0);//此线程退出
 }
 
