@@ -12,10 +12,21 @@ int main()
 {
     UINT8 result;
     printf("Hello ARM!\n");
-    char net_mac_loc[32]="00:04:9f:04:d2:35";  //唯一绑定MAC地址 本地 00:0c:29:7b:87:2c  融创 00:04:9f:04:d2:35 实验室 00:04:9f:04:d2:35
     Rce04aLedEncoderInit();//led初始化
     LightUpLed1();//点亮led1
-    result=CheckLocMac(net_mac_loc);//检查MAC地址有效性
+    //唯一绑定MAC地址 融创 00:04:9f:04:d2:35 本地 00:0c:29:7b:87:2c  实验室 00:04:9f:04:d2:35 现场 e0:38:2d:4f:ff:ff"
+    UINT8 net_mac_loc_num=4;
+    CHAR net_mac_loc[4][32]={"00:04:9f:04:d2:35","00:0c:29:7b:87:2c","00:04:9f:04:d2:35","e0:38:2d:4f:ff:ff"};
+    for (int i=0;i<net_mac_loc_num;i++)
+    {
+        result=CheckLocMac(net_mac_loc[i]);//检查MAC地址有效性
+        //如果找到有效MAC地址，则跳出检查
+        if (result==1)
+        {
+            break;
+        }
+    }
+
     if (result==0)
     {
         printf("Fail to init MAC address");

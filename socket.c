@@ -703,7 +703,7 @@ void RefreshPeriodMsgToAPP()
     {
         g_period_msg_to_app.next_work_level_recommend=0;
     }
-    LogWrite(INFO,"%s-%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d","WebSocket",g_current_time,g_period_msg_to_app.current_station_leave_time,g_period_msg_to_app.next_station_arrive_time,g_period_msg_to_app.next_station_leave_time,
+    LogWrite(INFO,"%s:%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d","WebSocketInfoKey",g_current_time,g_period_msg_to_app.current_station_leave_time,g_period_msg_to_app.next_station_arrive_time,g_period_msg_to_app.next_station_leave_time,
              g_period_msg_to_app.train_work_condition,g_period_msg_to_app.train_work_level,g_period_msg_to_app.train_distance,g_period_msg_to_app.optimize_flag,g_period_msg_to_app.next_speed_recommend,
              g_period_msg_to_app.next_work_level_recommend,g_period_msg_to_app.next_recommend_countdown,g_period_msg_to_app.next_recommend_distance);
 

@@ -535,6 +535,8 @@ void *WebSocketServer()
                 //发送失败,标记异常(后续会被自动回收)
                 if (result < 0)
                     wss->client[i].exitType = WET_SEND;
+                else
+                    LogWrite(INFO,"%s:%d","WebSocket:send msg 204 to APP!消息长度",length);
                 //printf("%s send msg 203 to %d\n",g_current_time,wss->client[i].fd);
 
 
@@ -563,6 +565,8 @@ void *WebSocketServer()
                     if (result < 0)
                         wss->client[i].exitType = WET_SEND;
                     printf("%s send msg 205 to %d,msg length %d\n",g_current_time,wss->client[i].fd,length);
+                    LogWrite(INFO,"%s:%d","WebSocket:send msg 205 to APP!消息长度",length);
+
                 }
             }
         }
@@ -712,11 +716,45 @@ UINT16 PackInitJsonDataToApp(char* json_data)
         cJSON_AddStringToObject(pItem,"station_id",temp);
         cJSON_AddItemToArray(pArray,pItem);
     }
+    //列车基本参数
+    cJSON* pRootTrain=cJSON_CreateObject();
+    sprintf(temp,"%s",g_static_data_csv.basic_param_csv.type[0]);
+    cJSON_AddStringToObject(pRootTrain,"type",temp);
+    sprintf(temp,"%f",g_static_data_csv.basic_param_csv.basic_a[0]);
+    cJSON_AddStringToObject(pRootTrain,"a",temp);
+    sprintf(temp,"%f",g_static_data_csv.basic_param_csv.basic_b[0]);
+    cJSON_AddStringToObject(pRootTrain,"b",temp);
+    sprintf(temp,"%f",g_static_data_csv.basic_param_csv.basic_c[0]);
+    cJSON_AddStringToObject(pRootTrain,"c",temp);
+    pArray = cJSON_CreateArray();
+    cJSON_AddItemToObject(pRootTrain,"speed",pArray);
+    FLOAT32 value_temp=0;
+    for(int i=0;i<g_static_data_csv.dynamics_csv.length;i++)
+    {
+        cJSON* obj_temp= cJSON_CreateNumber(g_static_data_csv.dynamics_csv.speed[i]);
+        cJSON_AddItemToArray(pArray,obj_temp);
+    }
+    pArray = cJSON_CreateArray();
+    cJSON_AddItemToObject(pRootTrain,"traction_aw0",pArray);
+    for(int i=0;i<g_static_data_csv.dynamics_csv.length;i++)
+    {
+        cJSON* obj_temp= cJSON_CreateNumber((UINT32)(g_static_data_csv.dynamics_csv.traction_aw0[i]*1000));
+        cJSON_AddItemToArray(pArray,obj_temp);
+    }
+    pArray = cJSON_CreateArray();
+    cJSON_AddItemToObject(pRootTrain,"brake_aw0",pArray);
+    for(int i=0;i<g_static_data_csv.dynamics_csv.length;i++)
+    {
+        cJSON* obj_temp= cJSON_CreateNumber((UINT32)(g_static_data_csv.dynamics_csv.brake_aw0[i]*1000));
+        cJSON_AddItemToArray(pArray,obj_temp);
+    }
+    cJSON_AddItemToObject(pRoot,"train_info",pRootTrain);
     cJSON_AddStringToObject(pRoot,"serve_flag","1");
     char *szJSON = cJSON_Print(pRoot);
     //printf("%s\n", szJSON);
     length=strlen(szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
+    cJSON_Delete(pRoot);
     free(szJSON);
     return length;
 }
@@ -854,10 +892,34 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
         cJSON_AddItemToArray(pArray,pItem);
     }
 
+    //临时限速信息
+    //2车牵引机组输入电压
+    sprintf(temp,"%d",g_period_msg_from_train.traction_voltage_2);
+    cJSON_AddStringToObject(pRoot,"traction_voltage_2",temp);
+    //3车牵引机组输入电压
+    sprintf(temp,"%d",g_period_msg_from_train.traction_voltage_3);
+    cJSON_AddStringToObject(pRoot,"traction_voltage_3",temp);
+    //2车牵引机组输入电流
+    sprintf(temp,"%d",g_period_msg_from_train.traction_current_2);
+    cJSON_AddStringToObject(pRoot,"traction_current_2",temp);
+    //3车牵引机组输入电流
+    sprintf(temp,"%d",g_period_msg_from_train.traction_current_3);
+    cJSON_AddStringToObject(pRoot,"traction_current_3",temp);
+    //输入电流符号
+    sprintf(temp,"%d",g_period_msg_from_train.traction_current_sign);
+    cJSON_AddStringToObject(pRoot,"traction_current_sign",temp);
+    //2车受电弓状态
+    sprintf(temp,"%d",g_period_msg_from_signal.pantograph_2_flag);
+    cJSON_AddStringToObject(pRoot,"pantograph_flag_2",temp);
+    //3车受电弓状态
+    sprintf(temp,"%d",g_period_msg_from_signal.pantograph_3_flag);
+    cJSON_AddStringToObject(pRoot,"pantograph_flag_3",temp);
     char *szJSON = cJSON_Print(pRoot);
     //printf("%s\n", szJSON);
+    //LogWrite(INFO,"%s:%s","WebSocketInfo204",szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
     length= strlen(szJSON);
+    cJSON_Delete(pRoot);
     free(szJSON);
     return length;
 }
@@ -872,6 +934,7 @@ UINT16 PackTriggerJsonDataToApp(char* json_data)
 {
     UINT16 length=0;
     UINT32 distance_temp=0;
+    UINT32 timestamp=0;
     cJSON* pRoot = cJSON_CreateObject();
     cJSON* pArray;
     cJSON* pItem;
@@ -905,12 +968,17 @@ UINT16 PackTriggerJsonDataToApp(char* json_data)
         cJSON_AddStringToObject(pItem,"distance",temp);
         sprintf(temp,"%f",3.6*g_speed_curve_offline[i]/100);
         cJSON_AddStringToObject(pItem,"speed",temp);
+        timestamp = (UINT32)(g_plan_time[i]*1000);
+        sprintf(temp,"%d",timestamp);
+        cJSON_AddStringToObject(pItem,"timestamp",temp);
         cJSON_AddItemToArray(pArray,pItem);
     }
     char *szJSON = cJSON_Print(pRoot);
+    //LogWrite(INFO,"%s:%s","WebSocketInfo205",szJSON);
     //printf("%s\n", szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
     length= strlen(szJSON);
+    cJSON_Delete(pRoot);
     free(szJSON);
     return length;
 }
@@ -966,9 +1034,11 @@ UINT16 PackLocationConfirmJsonDataToApp(char* json_data)
     }
 
     char *szJSON = cJSON_Print(pRoot);
+    //LogWrite(INFO,"%s:%s","WebSocketInfo206",szJSON);
 //    printf("%s\n", szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
     length= strlen(szJSON);
+    cJSON_Delete(pRoot);
     free(szJSON);
     return length;
 }
@@ -1056,7 +1126,7 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
     UINT8 serve_flag=0;
     CHAR* device_mac;
     cJSON* pRoot;
-    char send_buff[1024*10];
+    char send_buff[1024*20];
     pRoot= cJSON_Parse(receive_buff);
 //    char *debug = cJSON_Print(pRoot);
 //    printf("%s\n", debug);
@@ -1068,6 +1138,7 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
         switch (message_id)
         {
             case 103:
+                LogWrite(INFO,"%s","WebSocket:receive message 103 from APP!");
                 serve_flag= (UINT8)cJSON_GetObjectItem(pRoot,"serve_flag")->valueint;
                 if(serve_flag==1)
                 {
@@ -1078,7 +1149,10 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                     if (result < 0)
                         wsc->exitType = WET_SEND;
                     else
+                    {
+                        LogWrite(INFO,"%s","WebSocket:send init message 203 to APP success!");
                         printf("%s WEB SOCKET:send init message 203 to APP success!\n",g_current_time);
+                    }
                 }
                 else if (serve_flag==2)
                 {
@@ -1089,7 +1163,10 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                     if (result < 0)
                         wsc->exitType = WET_SEND;
                     else
+                    {
+                        LogWrite(INFO,"%s","WebSocket:send end message 203 to APP success!");
                         printf("%s WEB SOCKET:send end message 203 to APP success!\n",g_current_time);
+                    }
                 }
                 else
                 {
@@ -1099,10 +1176,14 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                     if (result < 0)
                         wsc->exitType = WET_SEND;
                     else
+                    {
+                        LogWrite(INFO,"%s","WebSocket:send error message 203 to APP success!");
                         printf("%s WEB SOCKET:send error message 203 to APP success!\n",g_current_time);
+                    }
                 }
                 break;
             case 104:
+                LogWrite(INFO,"%s","WebSocket:receive message 104 from APP!");
                 serve_flag= (UINT8)cJSON_GetObjectItem(pRoot,"serve_flag")->valueint;
                 if(serve_flag==1&&wsc->serveFlag==1)
                 {
@@ -1122,7 +1203,10 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                     if (result < 0)
                         wsc->exitType = WET_SEND;
                     else
+                    {
+                        LogWrite(INFO,"%s","WebSocket:send error message 203 to APP success!");
                         printf("%s WEB SOCKET:send error message 203 to APP success!\n",g_current_time);
+                    }
                 }
 
                 break;
@@ -1142,6 +1226,7 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                     g_plan_config_info.plan_station_info[i].station_id=(UINT8)cJSON_GetObjectItem(array_item,"station_id")->valueint;
                     g_plan_config_info.plan_station_info[i].jump_flag=(UINT8)cJSON_GetObjectItem(array_item,"is_jump")->valueint;
                 }
+                LogWrite(INFO,"%s","WebSocket:receive message 105 from APP!");
                 printf("%s WEB SOCKET:receive message 105 from APP!\n",g_current_time);
                 length= PackLocationConfirmJsonDataToApp(send_buff);
                 result = ws_send(wsc->fd, send_buff, length, false, WDT_TXTDATA);
@@ -1149,7 +1234,10 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
                 if (result < 0)
                     wsc->exitType = WET_SEND;
                 else
+                {
                     printf("%s WEB SOCKET:send message 206 to APP success!\n",g_current_time);
+                    LogWrite(INFO,"%s","WebSocket:send message 206 to APP success!");
+                }
 
                 break;
             default:
@@ -1164,7 +1252,10 @@ void UnpackJsonDataFromApp(char *receive_buff,Ws_Client *wsc)
         if (result < 0)
             wsc->exitType = WET_SEND;
         else
+        {
+            LogWrite(INFO,"%s","WebSocket:send error message 203 to APP success!");
             printf("%s WEB SOCKET:send error message 203 to APP success!\n",g_current_time);
+        }
     }
 
 }
