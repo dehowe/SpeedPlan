@@ -472,6 +472,8 @@ void onLogin(Ws_Client *wsc)
     printf("WEB SOCKET:onLogin: fd/%03d index/%03d total/%03d addr/%d.%d.%d.%d:%d\n",
            wsc->fd, wsc->index, wsc->wss->clientCount,
            wsc->ip[0], wsc->ip[1], wsc->ip[2], wsc->ip[3], wsc->port);
+    LogWrite(INFO,"%s","WEB SOCKET:onLogin!");
+
     //打招呼
     //ws_send(wsc->fd, (char*)"Say hi~ I am server", 19, false, WDT_TXTDATA);
 }
@@ -484,21 +486,27 @@ void onExit(Ws_Client *wsc, Ws_ExitType exitType)
     {
         case WET_EPOLL:
             printf("WEB SOCKET:onExit: fd/%03d index/%03d total/%03d disconnect by epoll\n", wsc->fd, wsc->index, wsc->wss->clientCount);
+            LogWrite(INFO,"%s","WEB SOCKET:disconnect by epoll!");
             break;
         case WET_SEND:
             printf("WEB SOCKET:onExit: fd/%03d index/%03d total/%03d disconnect by send\n", wsc->fd, wsc->index, wsc->wss->clientCount);
+            LogWrite(INFO,"%s","WEB SOCKET:disconnect by send!");
             break;
         case WET_LOGIN:
             printf("WEB SOCKET:onExit: fd/%03d index/%03d total/%03d disconnect by login failed \n", wsc->fd, wsc->index, wsc->wss->clientCount);
+            LogWrite(INFO,"%s","WEB SOCKET:disconnect by login failed!");
             break;
         case WET_LOGIN_TIMEOUT:
             printf("WEB SOCKET:onExit: fd/%03d index/%03d total/%03d disconnect by login timeout \n", wsc->fd, wsc->index, wsc->wss->clientCount);
+            LogWrite(INFO,"%s","WEB SOCKET:disconnect by login timeout!");
             break;
         case WET_DISCONNECT:
             printf("WEB SOCKET:onExit: fd/%03d index/%03d total/%03d disconnect by disconnect \n", wsc->fd, wsc->index, wsc->wss->clientCount);
+            LogWrite(INFO,"%s","WEB SOCKET:disconnect by disconnect!");
             break;
         default:
             printf("WEB SOCKET:onExit: fd/%03d index/%03d total/%03d disconnect by unknow \n", wsc->fd, wsc->index, wsc->wss->clientCount);
+            LogWrite(INFO,"%s","WEB SOCKET:disconnect by unknow!");
     }
 }
 
@@ -525,7 +533,18 @@ void *WebSocketServer()
         ws_delayms(200);
         LightChangeLed3();//led3闪烁
         //打包200ms周期数据
-        length=PackPeriodJsonDataToApp(send_buff);
+        int server_client_num = 0;
+        for (i = 0; i < WS_SERVER_CLIENT; i++)
+        {
+            if(wss->client[i].serveFlag==2)
+            {
+                server_client_num+=1;
+            }
+        }
+        if (server_client_num != 0)
+        {
+            length=PackPeriodJsonDataToApp(send_buff);
+        }
         //每200ms推送信息给所有客户端
         for (i = 0; i < WS_SERVER_CLIENT; i++)
         {
@@ -536,7 +555,7 @@ void *WebSocketServer()
                 if (result < 0)
                     wss->client[i].exitType = WET_SEND;
                 else
-                    LogWrite(INFO,"%s:%d","WebSocket:send msg 204 to APP!消息长度",length);
+                    LogWrite(INFO,"%s:%d","WebSocket:send msg 204 to APP!msg length",length);
                 //printf("%s send msg 203 to %d\n",g_current_time,wss->client[i].fd);
 
 
@@ -565,7 +584,7 @@ void *WebSocketServer()
                     if (result < 0)
                         wss->client[i].exitType = WET_SEND;
                     printf("%s send msg 205 to %d,msg length %d\n",g_current_time,wss->client[i].fd,length);
-                    LogWrite(INFO,"%s:%d","WebSocket:send msg 205 to APP!消息长度",length);
+                    LogWrite(INFO,"%s:%d","WebSocket:send msg 205 to APP!msg length",length);
 
                 }
             }
@@ -575,6 +594,7 @@ void *WebSocketServer()
 
     ws_server_release(&wss);
     printf("WEB SOCKET:server exit \r\n");
+    LogWrite(INFO,"%s","WebSocket:WEB SOCKET:server exit!");
 }
 
 /*************************************************************************
@@ -632,6 +652,11 @@ UINT16 PackInitJsonDataToApp(char* json_data)
     cJSON* pItem;
     char temp[50];
     cJSON_AddStringToObject(pRoot,"msg_type","203");
+    char version_label[50] ="v";
+    char version_value[50];
+    sprintf(version_value,"%.1f",VERSION);
+    strcat(version_label,version_value);
+    cJSON_AddStringToObject(pRoot,"program_version",version_label);
     //坡度数据
     pArray = cJSON_CreateArray();
     cJSON_AddItemToObject(pRoot,"gradient_info",pArray);
@@ -759,6 +784,8 @@ UINT16 PackInitJsonDataToApp(char* json_data)
     return length;
 }
 
+
+
 /*************************************************************************
  * 功能描述: 打包发送给APP的周期JSON数据
  * 输入参数: 无
@@ -773,6 +800,7 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     cJSON* pArray;
     cJSON* pItem;
     char temp[50];
+
     //消息标识
     cJSON_AddStringToObject(pRoot,"msg_type","204");
     //牵引故障标识
@@ -824,8 +852,17 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     sprintf(temp,"%s",g_period_msg_to_app.current_station_leave_time);
     cJSON_AddStringToObject(pRoot,"station_leave_time",temp);
     //列车计划到达下一车站名称
-    sprintf(temp,"%s",g_period_msg_to_app.next_station_name);
-    //printf("test:%s\n",temp);
+    char record[16];
+    memcpy(record,g_period_msg_from_signal.next_station_name_GBK,16);
+    char hexString[sizeof(record)*4+1];
+    snprintf(hexString,sizeof (hexString),"%02X%02X",(unsigned char )record[0],(unsigned char )record[1]);
+    for(int m=2;m<sizeof(record);m+=2)
+    {
+        snprintf(hexString+4*(m/2),sizeof (hexString)-4*(m/2),"%02X%02X",(unsigned char )record[m],(unsigned char )record[m+1]);
+    }
+    sprintf(temp,"%s",hexString);
+//    printf("test:%s\n",temp);
+//    LogWrite(INFO,"%s-%s","Test",temp);
     cJSON_AddStringToObject(pRoot,"next_station_name",temp);
     //列车计划到达下一车车站时分
     sprintf(temp,"%s",g_period_msg_to_app.next_station_arrive_time);
@@ -916,7 +953,7 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     cJSON_AddStringToObject(pRoot,"pantograph_flag_3",temp);
     char *szJSON = cJSON_Print(pRoot);
     //printf("%s\n", szJSON);
-    //LogWrite(INFO,"%s:%s","WebSocketInfo204",szJSON);
+    LogWrite(INFO,"%s,%s,%s","APP_MSG_204",g_current_time,szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
     length= strlen(szJSON);
     cJSON_Delete(pRoot);
@@ -974,7 +1011,7 @@ UINT16 PackTriggerJsonDataToApp(char* json_data)
         cJSON_AddItemToArray(pArray,pItem);
     }
     char *szJSON = cJSON_Print(pRoot);
-    //LogWrite(INFO,"%s:%s","WebSocketInfo205",szJSON);
+    LogWrite(INFO,"%s,%s,%s","APP_MSG_205",g_current_time,szJSON);
     //printf("%s\n", szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
     length= strlen(szJSON);
@@ -1034,7 +1071,7 @@ UINT16 PackLocationConfirmJsonDataToApp(char* json_data)
     }
 
     char *szJSON = cJSON_Print(pRoot);
-    //LogWrite(INFO,"%s:%s","WebSocketInfo206",szJSON);
+    LogWrite(INFO,"%s,%s,%s","APP_MSG_206",g_current_time,szJSON);
 //    printf("%s\n", szJSON);
     memcpy(json_data,szJSON, strlen(szJSON));
     length= strlen(szJSON);

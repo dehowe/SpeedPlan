@@ -132,6 +132,31 @@ void FillTunnelData(char *data,UINT16 row_index,UINT16 column_index)
 }
 
 /*************************************************************************
+* 功能描述: 填充分相区数据
+* 输入参数: 无
+* 输出参数: 无
+* 返回值:   无
+*************************************************************************/
+void FillSeparateData(char *data,UINT16 row_index,UINT16 column_index)
+{
+    switch (column_index)
+    {
+        case 0:
+            g_static_data_csv.separate_csv.length+=1;
+            g_static_data_csv.separate_csv.separate_id[row_index] = (UINT16)atoi(data);
+            break;
+        case 1:
+            g_static_data_csv.separate_csv.begin_distance[row_index] = (UINT32)atoi(data);
+            break;
+        case 2:
+            g_static_data_csv.separate_csv.end_distance[row_index] = (UINT32)atoi(data);
+            break;
+        default:
+            break;
+    }
+}
+
+/*************************************************************************
 * 功能描述: 填充曲线半径数据
 * 输入参数: 无
 * 输出参数: 无
@@ -427,6 +452,9 @@ int FillCsvData(char *data,UINT16 row_index,UINT16 column_index,UINT16 label_fla
         case 8:
             FillOptimizeData(data,row_index,column_index);
             break;
+        case 9:
+            FillSeparateData(data,row_index,column_index);
+            break;
         default:
             break;
     }
@@ -533,6 +561,14 @@ UINT8 StaticDataRead()
     if (result==0)
     {
         return result;
+    }
+    if (SEPARATE_ON_FLAG==1)
+    {
+        result = ReadCsvConfig("/LineData/LineDataSeparate.csv");
+        if (result==0)
+        {
+            return result;
+        }
     }
     return 1;
 }
@@ -1446,5 +1482,137 @@ UINT8 CheckLocMac(CHAR* mac_loc)
 
     return result;
 }
+
+struct statvfs buf;
+
+
+
+// 比较函数，用于qsort
+int compare(const void* a, const void* b) {
+    return strcmp(*(const char**)a, *(const char**)b);
+}
+
+
+void LogFileDelete(char *path)
+{
+    DIR *d;
+    struct dirent *dir;
+    int file_num =100;
+    char *files[file_num]; // 假设目录下不超过1024个文件
+    int count = 0;
+
+    // 打开目录
+    d = opendir(path);
+    if (d) {
+        while ((dir = readdir(d)) != NULL) {
+            // 过滤掉"."和".."目录
+            if(strcmp(dir->d_name, ".") != 0 && strcmp(dir->d_name, "..") != 0) {
+                files[count] = strdup(dir->d_name); // 保存文件名
+                count++;
+                // 如果路径下数据文件过多，则停止
+                if(count>file_num - 1)
+                {
+                    break;
+                }
+            }
+        }
+        closedir(d);
+    } else {
+        perror("Unable to open directory");
+        LogWrite(INFO,"%s","LOG_File_MANAGER:Unable to open directory");
+    }
+
+    // 对文件名进行排序
+    qsort(files, count, sizeof(char*), compare);
+
+    // 删除排序后的前N个文件（如果存在的话）
+    int deleteNum = 5;
+    char fullPath[file_num]; // 用于存储完整的文件路径
+    for (int i = 0; i < count && i < deleteNum; i++) {
+        sprintf(fullPath, "%s/%s", path, files[i]); // 构造完整的文件路径
+        if (remove(fullPath) == 0) { // 删除文件
+            printf("Deleted successfully: %s\n", fullPath);
+            LogWrite(INFO,"%s:%s","LOG_File_MANAGER:Deleted successfully",fullPath);
+        } else {
+            LogWrite(INFO,"%s","LOG_File_MANAGER:Error deleting file");
+            perror("Error deleting file");
+        }
+        free(files[i]); // 释放之前使用strdup分配的内存
+    }
+
+    // 释放剩下的文件名内存
+    for (int i = deleteNum; i < count; i++) {
+        free(files[i]);
+    }
+
+}
+
+/*************************************************************************
+ * 功能描述: 检查硬盘存储状态
+ * 输入参数: 无
+ * 输出参数: 无
+ * 返回值:   INT8   1:内存不足 0：内存正常 -1：错误
+ *************************************************************************/
+int GetDiskStatus()
+{
+    // 获得日志存储路径
+    char path[512]={0x0};
+    getcwd(path,sizeof(path));
+    strcat(path,"/log.conf");
+    char value[512]={0x0};
+    char level[512]={0x0};
+    char temp[512]={0x0};
+    int remain = 10;
+    FILE *fpath=fopen(path,"r");
+    if(fpath==NULL)
+    {
+        LogWrite(INFO,"%s","DISK_CHECK:log path error");
+        return -1;
+    }
+    fscanf(fpath,"path=%s\n",value);
+    fscanf(fpath,"level=%s\n",level);
+    fscanf(fpath,"remain=%s\n",temp);
+    remain = (int)atoi(temp);
+    // 查询空间剩余
+    if(statvfs(value,&buf)!=0)
+    {
+        // 出错处理
+        perror("statvfs error");
+        LogWrite(INFO,"%s","DISK_CHECK:statvfs error");
+        return -1;
+    }
+    // 计算总大小和空闲空间大小（单位：字节），然后转换为GB
+    double total_gb = (double)buf.f_blocks * buf.f_bsize / (1024 * 1024 * 1024);
+    double free_gb = (double)buf.f_bfree * buf.f_bsize / (1024 * 1024 * 1024);
+    LogWrite(INFO,"%s:%f,%s:%f","DISK_CHECK:memory(GB) all",total_gb,"free",free_gb);
+    // 如果剩余空间小于设定，需要删除历史日志
+    if (free_gb < remain)
+    {
+        LogWrite(INFO,"%s:%d","DISK_CHECK:memory free size less than",remain);
+        LogFileDelete(value);
+        return 1;
+    }
+    return 0;
+}
+
+
+/*************************************************************************
+ * 功能描述: 检查硬盘空间是否满足日志记录需求
+ * 输入参数: 无
+ * 输出参数: 无
+ * 返回值:   无
+ *************************************************************************/
+void *DiskCheckServer()
+{
+    while (1)
+    {
+        // 查询硬盘空间
+        GetDiskStatus();
+        // 间隔60s
+        sleep(60);
+    }
+}
+
+
 
 #pragma endregion

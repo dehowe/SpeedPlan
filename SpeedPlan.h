@@ -188,6 +188,17 @@ FLOAT64 GetAccBySpeed(FLOAT64 kph, UINT16 num, const UINT16* curve_v, const UINT
 FLOAT32 GetTractionAcc(UINT16 speed);
 
 /*************************************************************************
+* 功能描述: 根据牵引周期计算级位(级位平滑)
+* 输入参数:
+*		int						traction_index					牵引周期
+* 输出参数:
+* 返回值:
+*		UINT16						级位
+*************************************************************************/
+UINT16 GetTractionLevel(int traction_index);
+UINT16 GetBrakeLevel(int brake_index);
+
+/*************************************************************************
 * 功能描述: 根据速度计算制动加速度
 * 输入参数:
 *		UINT16						speed					速度 cm/s

@@ -9,15 +9,23 @@ static volatile int can1;
  * 输出参数: 无
  * 返回值:   UINT64数据
  *************************************************************************/
-int CodeConvertGBKToUTF8(char* input, size_t charInPutLen, char* output, size_t charOutPutLen)
-{
-    int ret = 0;
-    iconv_t cd;
-    cd = iconv_open("utf-8", "GBK");
-    ret = iconv(cd, &input, &charInPutLen, &output, &charOutPutLen);
-    iconv_close(cd);
-    return ret;
-}
+//int CodeConvertGBKToUTF8(char* input, size_t charInPutLen, char* output, size_t charOutPutLen)
+//{
+//    int ret = 0;
+//    iconv_t cd;
+//    cd = iconv_open("utf-8", "GBK");
+//    if(cd==-1)
+//    {
+//        LogWrite(INFO,"%s-%s",g_current_time,"iconv open error");
+//    }
+//    ret = iconv(cd, &input, &charInPutLen, &output, &charOutPutLen);
+//    if(ret==-1)
+//    {
+//        LogWrite(INFO,"%s-%s",g_current_time,"iconv utf-8 error");
+//    }
+//    iconv_close(cd);
+//    return ret;
+//}
 
 /*************************************************************************
  * 功能描述: 将8字节数据流变为UINT64
@@ -252,7 +260,7 @@ UINT8 GetCurrentDistance()
         }
 
         //停站阶段，根据GPS定位辅助速度差分，校正公里标，只在开门时进行一次
-        if(g_period_msg_from_signal.door_flag_last==0&&g_period_msg_from_signal.door_flag==1&&g_period_msg_from_signal.train_speed==0)
+        if(g_period_msg_from_signal.door_flag_last==1&&g_period_msg_from_signal.door_flag==0&&g_period_msg_from_signal.train_speed==0)
         {
             UINT32 error_dis_gps=65535; //GPS定位误差
             UINT32 error_dis_spd=65535; //速度积分定位误差
@@ -317,7 +325,7 @@ UINT8 GetCurrentDistance()
 void GetCurrentPlan()
 {
     //如果当前列车车门打开，且当前速度为0,且计划更新
-    if(g_period_msg_from_signal.door_flag==1&&g_period_msg_from_signal.train_speed==0&&g_plan_config_info.plan_refresh_flag==1)
+    if(g_period_msg_from_signal.door_flag==0&&g_period_msg_from_signal.train_speed==0&&g_plan_config_info.plan_refresh_flag==1)
     {
         //根据公里标查询当前站
         UINT8 plan_station_num=g_plan_config_info.plan_station_num;
@@ -378,7 +386,7 @@ void GetCurrentPlan()
 void GetArriveAndLeaveTime()
 {
     //arrive
-    if (g_period_msg_from_signal.door_flag_last==0&&g_period_msg_from_signal.door_flag==1&&g_period_msg_from_signal.train_speed==0)
+    if (g_period_msg_from_signal.door_flag_last==1&&g_period_msg_from_signal.door_flag==0&&g_period_msg_from_signal.train_speed==0)
     {
         INT32 current_timestamp=DateToTimeStamp(g_current_time);
         INT32 arrive_timestamp=0;
@@ -415,12 +423,13 @@ void GetArriveAndLeaveTime()
         memcpy(g_period_msg_from_signal.next_station_leave_time,date,20);
     }
     //leave
-    if (g_period_msg_from_signal.door_flag_last==1&&g_period_msg_from_signal.door_flag==0)
+    if (g_period_msg_from_signal.door_flag_last==0&&g_period_msg_from_signal.door_flag==1)
     {
         memcpy(g_period_msg_from_signal.current_station_leave_time,g_current_time,20);
     }
 
 }
+
 
 
 /*************************************************************************
@@ -541,17 +550,24 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         int srclen = 100;
         int dstlen = 100;
         int ret;
+        char record[48];
         memcpy(in,index,16);
-        ret = CodeConvertGBKToUTF8(in,srclen,dst,dstlen);
-        memcpy(g_period_msg_from_signal.current_station_name,dst,dstlen);
+        memcpy(record,in,16);
+        memcpy(g_period_msg_from_signal.current_station_name_GBK,record,16);
+//        ret = CodeConvertGBKToUTF8(in,srclen,dst,dstlen);
+//        memcpy(g_period_msg_from_signal.current_station_name,dst,dstlen);
         index+=16;
         memcpy(in,index,16);
-        ret = CodeConvertGBKToUTF8(in,srclen,dst,dstlen);
-        memcpy(g_period_msg_from_signal.next_station_name,dst,dstlen);
+        memcpy(record+16,in,16);
+        memcpy(g_period_msg_from_signal.next_station_name_GBK,in,dstlen);
+//        ret = CodeConvertGBKToUTF8(in,srclen,dst,dstlen);
+//        memcpy(g_period_msg_from_signal.next_station_name,dst,dstlen);
         index+=16;
         memcpy(in,index,16);
-        ret = CodeConvertGBKToUTF8(in,srclen,dst,dstlen);
-        memcpy(g_period_msg_from_signal.dst_station_name,dst,dstlen);
+        memcpy(record+32,in,16);
+        memcpy(g_period_msg_from_signal.dst_station_name_GBK,in,dstlen);
+//        ret = CodeConvertGBKToUTF8(in,srclen,dst,dstlen);
+//        memcpy(g_period_msg_from_signal.dst_station_name,dst,dstlen);
         index+=16;
         g_period_msg_from_train.train_fault_code= ShortFromChar(index);
         index+=2;
@@ -581,10 +597,20 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         GetArriveAndLeaveTime();//根据运行计划，更新时间
         //printf("dis:%d\n",g_period_msg_from_signal.train_distance);
         printf("CAN data unpack success\n");
-        //LogWrite(INFO,"%s-%s,%d,%d","MESSAGE",g_current_time,g_direction,g_period_msg_from_signal.next_station_id);
-        LogWrite(INFO,"%s-%s,%s-%d,%s-%d,%s-%d,%s-%d,%s-%d,%s-%d,%s-%d,%s-%s-%s,%d","ENERGY",g_current_time,"byte",g_period_msg_from_signal.byte_data,"spd",(UINT16)(g_period_msg_from_signal.train_speed*100),
-                 "dis",g_period_msg_from_signal.train_distance,"lng",g_period_msg_from_signal.longitude_value,"lng_dir",g_period_msg_from_signal.longitude_direction,"lat",g_period_msg_from_signal.latitude_value,
-                 "lat_dir",g_period_msg_from_signal.latitude_direction,g_period_msg_from_signal.current_station_name,g_period_msg_from_signal.next_station_name,g_period_msg_from_signal.dst_station_name,g_direction);
+        char hexString[sizeof(record)*4+1];
+        snprintf(hexString,sizeof (hexString),"%02X%02X",(unsigned char )record[0],(unsigned char )record[1]);
+        for(int m=2;m<sizeof(record);m+=2)
+        {
+            snprintf(hexString+4*(m/2),sizeof (hexString)-4*(m/2),"%02X%02X",(unsigned char )record[m],(unsigned char )record[m+1]);
+        }
+        LogWrite(INFO,"%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%f,%s,%d,%d,%d,%d,%d,%d,%d,%s","CAN_MSG",g_current_time,g_period_msg_from_train.train_weight,g_period_msg_from_train.formation_num,g_period_msg_from_train.train_length,g_period_msg_from_train.traction_voltage_2,
+                 g_period_msg_from_train.traction_voltage_3,g_period_msg_from_train.traction_voltage_side_2,g_period_msg_from_train.traction_voltage_side_3,g_period_msg_from_train.traction_current_2,g_period_msg_from_train.traction_current_3,
+                 g_period_msg_from_train.traction_current_low_2,g_period_msg_from_train.traction_current_low_3,g_period_msg_from_train.traction_current_sign,g_period_msg_from_train.traction_fault_flag,g_period_msg_from_train.brake_fault_flag,
+                 g_period_msg_from_train.other_fault_flag,g_period_msg_from_train.traction_energy_sum,g_period_msg_from_train.brake_energy_sum,g_period_msg_from_signal.traction_energy,g_period_msg_from_signal.regeneration_energy,
+                 g_period_msg_from_signal.train_direction,g_period_msg_from_signal.train_id,g_period_msg_from_signal.train_number,g_period_msg_from_signal.arrive_flag,g_period_msg_from_signal.leave_flag,g_period_msg_from_signal.byte_data,
+                 g_period_msg_from_signal.train_plan_flag,g_period_msg_from_signal.train_ebi,g_period_msg_from_signal.train_speed,g_period_msg_from_signal.train_time,g_period_msg_from_signal.train_work_speed,g_period_msg_from_signal.train_work_level,
+                 g_period_msg_from_signal.longitude_value,g_period_msg_from_signal.longitude_direction,g_period_msg_from_signal.latitude_value,g_period_msg_from_signal.latitude_direction,g_period_msg_from_train.train_fault_code,hexString);
+
         result = 1;//解析成功
         return result;
     }

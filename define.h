@@ -44,6 +44,11 @@ typedef long int            INT64;
 #define SPEED_MODE                  0               // 速度模式
 #define LEVEL_MODE                  1               // 级位模式
 #define DISTANCE_ERROR              200             // 允许的定位误差 m
+#define SEPARATE_ON_FLAG            0               // 分相区使用标识 0：无效 1：有效
+#define VERSION                     8.8             // 程序版本
+
+// v8.8 add disk check and log file manage
+
 #pragma region 曲线优化所需数据结构体定义
 /*列车参数结构体*/
 typedef struct
@@ -198,6 +203,15 @@ typedef struct
     UINT16 tunnel_param[MAX_TUNNEL_CSV_NUM]; /*参数*/
 }TUNNEL_CSV;
 
+/*分相区静态数据*/
+typedef struct
+{
+    UINT16 length;					/*数据个数*/
+    UINT16 separate_id[MAX_SEPARATE_CSV_NUM]; /*ID*/
+    UINT32 begin_distance[MAX_SEPARATE_CSV_NUM];	/*公里标 m*/
+    UINT32 end_distance[MAX_SEPARATE_CSV_NUM];	/*公里标 m*/
+}SEPARATE_CSV;
+
 /*列车基础参数静态数据*/
 typedef struct
 {
@@ -288,6 +302,7 @@ typedef struct
     GRADIENT_CSV gradient_csv;         /*线路坡度静态数据*/
     CURVE_RADIUS_CSV curve_radius_csv; /*曲线半径静态数据*/
     TUNNEL_CSV tunnel_csv;             /*桥梁隧道静态数据*/
+    SEPARATE_CSV separate_csv;         /*分相区静态数据*/
     BASIC_PARAM_CSV basic_param_csv;   /*列车基础参数静态数据*/
     DYNAMICS_CSV dynamics_csv;         /*列车动力学静态数据*/
     OPTIMIZE_CSV optimize_csv;         /*离线优化数据*/
@@ -385,6 +400,9 @@ typedef struct
     CHAR current_station_name[100];  /*当前站名称*/
     CHAR next_station_name[100];  /*下一站名称*/
     CHAR dst_station_name[100];  /*终点站名称*/
+    CHAR current_station_name_GBK[100];  /*当前站名称GBK编码*/
+    CHAR next_station_name_GBK[16];  /*下一站名称GBK编码*/
+    CHAR dst_station_name_GBK[100];  /*终点站名称GBK编码*/
     UINT8 next_station_arrive_time[20];  /*下一站到达时间*/
     UINT8 next_station_leave_time[20];   /*下一站出发时间*/
     UINT8 train_work_condition;            /*列车工况 1:牵引  2:惰行 3:制动 4:无效*/
@@ -455,10 +473,10 @@ typedef struct
     UINT8 optimize_flag;        /*曲线优化标志 1:正在优化 2:优化完成 3:其他*/
     UINT16 train_ebi;           /*ATP防护速度 km/h*/
     UINT16 train_speed;         /*列车速度 km/h*/
-    UINT8 current_station_leave_time[20]; /*下一站出发时间*/
-    UINT8 next_station_name[20]; /*下一站名称*/
-    UINT8 next_station_arrive_time[20];/*下一站到达时间*/
-    UINT8 next_station_leave_time[20]; /*下一站出发时间*/
+    CHAR current_station_leave_time[20]; /*下一站出发时间*/
+    CHAR next_station_name_byte[20]; /*下一站名称*/
+    CHAR next_station_arrive_time[20];/*下一站到达时间*/
+    CHAR next_station_leave_time[20]; /*下一站出发时间*/
     UINT8 train_work_condition;        /*列车工况 1:牵引  2:惰行 3:制动 4:无效*/
     UINT8 train_work_level;            /*列车级位*/
     UINT32 train_distance;             /*列车公里标 m*/

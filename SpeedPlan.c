@@ -24,6 +24,7 @@ UINT16* speed_limit_max = NULL;					 // 初始化最快速度存储指针;
 UINT16* speed_limit_min = NULL;					 // 初始化最小速度存储指针;
 UINT16* speed_limit_mmax = NULL;				 // 初始化顶棚限速存储指针;
 UINT16* level_output_flag = NULL;				 // 初始化级位输出标识1：牵引；2：惰行;3：制动;
+UINT16* level_output_value = NULL;				 // 初始化级位值0-100;
 FLOAT32* plan_time = NULL;						 // 初始化在离散点需要达到的运行时分;
 UINT32	interval_length;						// 下一区间长度m
 UINT32	interval_length_cm;						// 下一区间长度cm
@@ -45,11 +46,11 @@ UINT16 remain_section_length;					// 区间进行等间隔离散后的剩余长�
 void SpeedPlanMain()
 {
     /*如果信号系统发送允许计划更新且无正在进行的曲线优任务*/
-    if(g_period_msg_from_signal.door_flag==1&&g_speed_plan_info.optimize_stage==2&&g_period_msg_from_signal.next_station_id!=0)
+    if(g_period_msg_from_signal.door_flag==0&&g_speed_plan_info.optimize_stage==2&&g_period_msg_from_signal.next_station_id!=0&&g_speed_plan_info.optimize_station!=g_period_msg_from_signal.next_station_id)
     {
         g_speed_plan_flag=1;//已启动速度优化
         printf("%s SPEED_PLAN:receive plan change and optimize end!\n",g_current_time);
-        LogWrite(INFO,"%s-%s",g_current_time,"SPEED_PLAN:receive plan change and optimize end!");
+        LogWrite(INFO,"%s-%s",g_current_time,"SPEED_PLAN_RECEIVE:receive plan change and optimize end!");
 
         //参数校验
         UINT8 data_error_flag=0;//数据异常标志 0：无异常 1：数据异常
@@ -71,7 +72,7 @@ void SpeedPlanMain()
         {
             data_error_flag=1;
             printf("SPEED_PLAN:error code 1!");
-            LogWrite(INFO,"%s","SPEED_PLAN:error code 1!");
+            LogWrite(INFO,"%s","SPEED_PLAN_ERROR:error code 1!");
 
         }
         //如果数据无异常
@@ -93,7 +94,7 @@ void SpeedPlanMain()
                         {
                             data_error_flag=1;
                             printf("SPEED_PLAN:error code 2!");
-                            LogWrite(INFO,"%s","SPEED_PLAN:error code 2!");
+                            LogWrite(INFO,"%s","SPEED_PLAN_ERROR:error code 2!");
                             break;
                         }
                         if(i!=0)
@@ -105,7 +106,7 @@ void SpeedPlanMain()
                             g_speed_plan_info.target_time=0;
                             data_error_flag=1;
                             printf("SPEED_PLAN:error code 3!");
-                            LogWrite(INFO,"%s","SPEED_PLAN:error code 3!");
+                            LogWrite(INFO,"%s","SPEED_PLAN_ERROR:error code 3!");
                             break;
                         }
                     }
@@ -116,7 +117,7 @@ void SpeedPlanMain()
                         {
                             data_error_flag=1;
                             printf("SPEED_PLAN:error code 4!");
-                            LogWrite(INFO,"%s","SPEED_PLAN:error code 4!");
+                            LogWrite(INFO,"%s","SPEED_PLAN_ERROR:error code 4!");
                             break;
                         }
                     }
@@ -130,7 +131,7 @@ void SpeedPlanMain()
         if (data_error_flag==0)
         {
             printf("%s SPEED_PLAN:speed plan thread on!\n",g_current_time);
-            LogWrite(INFO,"%s-%s",g_current_time,"SPEED_PLAN:speed plan thread on!");
+            LogWrite(INFO,"%s,%s-%s","SPEED_PLAN_THREAD",g_current_time,":speed plan thread on!");
 
             g_speed_plan_info.optimize_stage=1;//曲线优化标志置为：正在曲线优化中
             pthread_t tid_speed_plan;
@@ -165,6 +166,7 @@ void *SpeedPlanOffline()
     speed_limit_min = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));				// 初始化最小速度存储指针;
     speed_limit_mmax = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));				// 初始化顶棚限速存储指针;
     level_output_flag = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));              // 初始化级位输出标识1：牵引；2：惰行;3：制动；;
+    level_output_value = (UINT16*)malloc(MAX_SPEED_CURVE * sizeof(UINT16));              // 初始化级位输出标识1：牵引；2：惰行;3：制动；;
     plan_time = (FLOAT32*)malloc(MAX_SPEED_CURVE * sizeof(FLOAT32));					// 初始化在离散点需要达到的运行时分;
 
     //数据准备
@@ -186,6 +188,8 @@ void *SpeedPlanOffline()
     //离线求解
     //出口参数初始化
     memset(level_output_flag, 0, MAX_SPEED_CURVE * sizeof(UINT16));
+    memset(level_output_value, 0, MAX_SPEED_CURVE * sizeof(UINT16));
+
     dim = GetOptimalSpeedOffline(speed_curve_offline, g_discrete_size, speed_limit_max, speed_limit_min, speed_limit_mmax,
                                  interval_length_cm, speed_limit_location, speed_limit, limit_num, target_time_offline, solution_num);
     //sleep(10);//模拟板卡求解时间
@@ -199,7 +203,7 @@ void *SpeedPlanOffline()
     UINT32 finish = clock();
     UINT32 cal_time=(finish - start) / 1000;
     printf("%s SPEED_PLAN:solve end, use time % d ms!\n",g_current_time, cal_time);
-    LogWrite(INFO,"%s:%d%s","end:use_time",cal_time,"ms");
+    LogWrite(INFO,"%s,%s:%d%s","SPEED_PLAN_UseTIME","end:use_time",cal_time,"ms");
 
     free(gradient);
     free(curve_radius);
@@ -211,6 +215,7 @@ void *SpeedPlanOffline()
     free(speed_limit_min);
     free(speed_limit_mmax);
     free(level_output_flag);
+    free(level_output_value);
     free(plan_time);
     LightDownLed4();//led4熄灭
     pthread_exit(0);//此线程退出
@@ -407,7 +412,7 @@ UINT16 GetOptimalSpeedOffline(UINT16* speed_curve, UINT16 discrete_size, UINT16*
     for (INT32 i = 0; i < bound_size; i++)
     {
         //printf("lower_bound:%d;upper_bound:%d\n", lower_bound[i], upper_bound[i]);
-        LogWrite(INFO,"%s:%d,%s:%d","lower_bound",lower_bound[i],"upper_bound",upper_bound[i]);
+        LogWrite(INFO,"%s,%s:%d,%s:%d","SPEED_PLAN_BOUND","lower_bound",lower_bound[i],"upper_bound",upper_bound[i]);
     }
     //灰狼算法求解
     GWO_Offline(speed_curve, speed_limit_max, speed_limit_min, dim, target_time, discrete_size, lower_bound, upper_bound, switch_flag, bound_size);
@@ -494,7 +499,7 @@ void Modeling(UINT16* speed_limit_max, UINT16* speed_limit_min, UINT16* speed_li
         speed_limit_max[i] = speed_limit_temp[i];
         speed_limit_min[i] = 0;
         //printf("最大防护速度%d\n", speed_limit_max[i]);
-        LogWrite(INFO,"%s:%d","max_speed",speed_limit_max[i]);
+        LogWrite(INFO,"%s,%s:%d","SPEED_PLAN_LimitMax","max_speed",speed_limit_max[i]);
     }
     /*释放所申请的内存, 防止内存泄露*/
     free(speed_limit_temp);
@@ -701,13 +706,13 @@ void GWO_Offline(UINT16* optimal_speed, UINT16* speed_limit_max, UINT16* speed_l
     for (UINT16 i = 0; i < dim + 1; i++)//输出最优解
     {
         optimal_speed[i] = OptimalSpd[i];
-        //printf("loc:%dm-speed:%dcm/s-switch:%d\n", i*discrete_size/100, OptimalSpd[i], level_output_flag[i]);
-        LogWrite(INFO,"%s:%d%s:%d%s:%d","loc",i*discrete_size/100,"m,speed",OptimalSpd[i],"cm/s,switch",level_output_flag[i]);
+//        printf("loc:%dm-speed:%dcm/s-switch:%d-%d\n", i*discrete_size/100, OptimalSpd[i], level_output_flag[i],level_output_value[i]);
+        LogWrite(INFO,"%s,%s:%d%s:%d%s:%d-%d","SPEED_PLAN_RESULT","loc",i*discrete_size/100,"m,speed",OptimalSpd[i],"cm/s,switch",level_output_flag[i],level_output_value[i]);
 
     }
 
     printf("%s SPEED_PLAN:next_station:%d,interval_length:%d-target_time:%d-optimize_time：%.3f\n",g_current_time,g_speed_plan_info.next_station_id, interval_length, target_time, plan_time[dim - 1]);
-    LogWrite(INFO,"%s:%d%s:%d%s:%f","interval_length",interval_length,"m,target_time",target_time,"s,optimize_time",plan_time[dim - 1]);
+    LogWrite(INFO,"%s,%s:%d%s:%d%s:%f","SPEED_PLAN_SUMMARY","interval_length",interval_length,"m,target_time",target_time,"s,optimize_time",plan_time[dim - 1]);
     g_speed_plan_info.optimize_evaluate=abs(plan_time[dim - 1] - target_time);
     for (UINT16 i = 0; i < dim + 1; i++)//输出最优解
     {
@@ -772,9 +777,10 @@ FLOAT32 GetFitnessOffline2(UINT16* optimal_speed, FLOAT32* position, UINT16 disc
     FLOAT32 acc_qxbj;//曲线半径附加加速度
     FLOAT32 acc_w;//基本阻力附加加速度
     FLOAT32 acc_traction;//牵引加速度
+    FLOAT32 acc_brake;//制动加速度
     FLOAT32 acc_index;//等效加速度
     FLOAT32 v_next;//下一速度
-    FLOAT32 P = 0.99f;//运行时分惩罚系数
+    FLOAT32 P = 1;//运行时分惩罚系数
     FLOAT32 fitness;//目标函数值
     UINT8 pos_index = 0;//解索引
     for (UINT32 i = 0; i < dim; i++)
@@ -782,12 +788,13 @@ FLOAT32 GetFitnessOffline2(UINT16* optimal_speed, FLOAT32* position, UINT16 disc
         acc_gradient = GetGradientAcc(i * discrete_size);
         acc_qxbj = GetCurveRadiusAcc(i * discrete_size);
         acc_w = GetResistanceAcc((UINT16)v_index);
-        acc_traction = GetTractionAcc((UINT16)v_index) * SPEED_PLAN_TB_RATIO;
+        acc_traction = GetTractionAcc((UINT16)v_index);
+        acc_brake= GetBreakAcc((UINT16)v_index);
         if (i * discrete_size <= position[pos_index])
         {
             if (switch_flag[pos_index] == 1)//牵引-惰行
             {
-                acc_index = acc_traction - acc_w - acc_gradient - acc_qxbj;
+                acc_index = acc_traction  - acc_w - acc_gradient - acc_qxbj;
                 v_next = sqrt(v_index * v_index + 2 * acc_index * discrete_size);
                 if (v_next >= speed_limit_max[i + 1])//下一规划速度超速
                 {
@@ -799,9 +806,13 @@ FLOAT32 GetFitnessOffline2(UINT16* optimal_speed, FLOAT32* position, UINT16 disc
                     energy_sum = energy_sum + (FLOAT32)train_weight * acc_traction * discrete_size / 10000;
                 }
                 level_output_flag[i] = 1;
+                level_output_value[i] = (UINT16)(100 * SPEED_PLAN_TB_RATIO);
             }
             else if (switch_flag[pos_index] == 3)//制动-惰行
             {
+                level_output_flag[i] = 3;
+                level_output_value[i] = (UINT16)(100 * SPEED_PLAN_TB_RATIO);
+
             }
             else
             {
@@ -815,6 +826,7 @@ FLOAT32 GetFitnessOffline2(UINT16* optimal_speed, FLOAT32* position, UINT16 disc
                     v_next = 0.1f;
                 }
                 level_output_flag[i] = 2;
+                level_output_value[i] = 0;
             }
             //更新下一工况切换点
             if ((i + 1) * discrete_size > position[pos_index] && pos_index < switch_num - 1)
@@ -834,21 +846,35 @@ FLOAT32 GetFitnessOffline2(UINT16* optimal_speed, FLOAT32* position, UINT16 disc
                 v_next = 0.1f;
             }
             level_output_flag[i] = 2;
+            level_output_value[i] = 0;
         }
         //边界约束
         if (v_next > speed_limit_max[i + 1])
         {
             v_next = speed_limit_max[i + 1];
-            //如果当前处于牵引阶段，规划速度大于防护速度，则驾驶阶段切换为惰行。
-            if (switch_flag[pos_index] == 1 && i * discrete_size <= position[pos_index])
+            // 根据实际加速度设置级位
+            acc_index = (float)((v_next*v_next-v_index*v_index)/(2.0*discrete_size) + acc_gradient);
+            if(acc_index>0)
             {
-                level_output_flag[i] = 2;
+                level_output_flag[i] = 1;
+                level_output_value[i] = (UINT16)(100.0 * acc_index / acc_traction);
             }
-                //否则驾驶阶段切换为制动
-            else
+            else if(acc_index<-acc_brake * 0.2)
             {
                 level_output_flag[i] = 3;
+                level_output_value[i] = (UINT16)(100.0 * -acc_index / acc_brake);
+                if(i>0 && abs(level_output_value[i]-level_output_value[i-1])<10)
+                {
+                    level_output_value[i] = level_output_value[i-1];
+                }
             }
+            else
+            {
+                level_output_flag[i] = 2;
+                level_output_value[i] = 0;
+            }
+
+
         }
         /*if (v_next < SpeedLimitMin[i + 1])
         {
@@ -868,6 +894,7 @@ FLOAT32 GetFitnessOffline2(UINT16* optimal_speed, FLOAT32* position, UINT16 disc
     }
     optimal_speed[dim] = (UINT16)v_index;
     level_output_flag[dim] = 3;
+    level_output_value[dim] = 100;
     fitness = (1 - P) * energy_sum / 1000000 + P * abs(time_sum - target_time);
     return fitness;
 }
@@ -950,7 +977,57 @@ FLOAT32 GetTractionAcc(UINT16 speed)
             break;
     }
     tp = NULL;
-    return (FLOAT32)acc; // 牵引返回正值
+    return (FLOAT32)(acc * SPEED_PLAN_TB_RATIO); // 牵引返回正值
+}
+
+/*************************************************************************
+* 功能描述: 根据牵引周期计算级位(级位平滑)
+* 输入参数:
+*		int						traction_index					牵引周期
+* 输出参数:
+* 返回值:
+*		UINT16						级位
+*************************************************************************/
+UINT16 GetTractionLevel(int traction_index)
+{
+    UINT16 level_value;
+    int traction_period = 15;
+    float tractionLevel;
+    if(traction_index>traction_period)
+    {
+        tractionLevel = 1;
+    }
+    else
+    {
+        tractionLevel = (float)(0.2 +0.8*traction_index/traction_period);
+    }
+    level_value = SPEED_PLAN_TB_RATIO * tractionLevel*100;
+    return level_value;
+}
+
+/*************************************************************************
+* 功能描述: 根据制动周期计算级位(级位平滑)
+* 输入参数:
+*		int						brake_index					制动周期
+* 输出参数:
+* 返回值:
+*		UINT16						级位
+*************************************************************************/
+UINT16 GetBrakeLevel(int brake_index)
+{
+    UINT16 level_value;
+    int brake_period = 15;
+    float brakeLevel;
+    if(brake_index>brake_period)
+    {
+        brakeLevel = 1;
+    }
+    else
+    {
+        brakeLevel = (float)(0.2 +0.8*brake_index/brake_period);
+    }
+    level_value = SPEED_PLAN_TB_RATIO * brakeLevel*100;
+    return level_value;
 }
 
 /*************************************************************************
@@ -985,7 +1062,7 @@ FLOAT32 GetBreakAcc(UINT16 speed)
             break;
     }
     tp = NULL;
-    return (FLOAT32)acc; // 制动返回正值
+    return (FLOAT32)(acc* SPEED_PLAN_TB_RATIO); // 制动返回正值
 }
 /*************************************************************************
 * 功能描述: 根据速度计算基本阻力附加加速度
@@ -1273,15 +1350,7 @@ UINT8 DivideStageByOptimizeSpeed()
         {
             g_speed_curve_offline[i]=speed_curve_offline[i];
             g_level_flag[i]=level_output_flag[i];
-            //根据级位计算级位值，在线优化采用的固定级位比率优化
-            if (g_level_flag[i]==1||g_level_flag[i]==3)
-            {
-                g_level_output[i]=SPEED_PLAN_TB_RATIO*100;
-            }
-            else
-            {
-                g_level_output[i]=0;
-            }
+            g_level_output[i] = level_output_value[i];
             g_plan_time[i]=plan_time[i];
         }
     }

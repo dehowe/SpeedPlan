@@ -5,7 +5,7 @@ PERIOD_MSG_TO_APP g_period_msg_to_app;            //发送给APP的周期数据�
 PERIOD_MSG_FROM_TRAIN g_period_msg_from_train;    //车辆系统发送的周期数据，全局变量
 PERIOD_MSG_FROM_SIGNAL g_period_msg_from_signal;  //信号系统发送的周期数据，全局变量
 DEVICE_MAC_DATA g_device_mac_data;                 //白名单设备MAC地址，全局变量
-char g_current_time[20]="2000-01-01 00:00:00"; //当前时钟，跟信号系统同步
+char g_current_time[20]="2000-00-00 00:00:00"; //当前时钟，跟信号系统同步
 
 UINT8 g_direction=0; //列车运行方向 1：上行 0：下行
 UINT8 g_speed_plan_flag; //是否进行曲线优化的标志 1：开始 0：未开始
@@ -648,7 +648,6 @@ UINT16 PackEndMsgToAPP(UINT8 *send_buffer)
 }
 
 
-
 /*************************************************************************
  * 功能描述: 更新发送给APP的周期数据
  * 输入参数: 无
@@ -673,7 +672,7 @@ void RefreshPeriodMsgToAPP()
     g_period_msg_to_app.train_speed=(UINT16)g_period_msg_from_signal.train_speed;
 
     memcpy(g_period_msg_to_app.current_station_leave_time,g_period_msg_from_signal.current_station_leave_time,20);//打包当前站出发时间
-    memcpy(g_period_msg_to_app.next_station_name,g_period_msg_from_signal.next_station_name,20);//打包下一站名词
+
     memcpy(g_period_msg_to_app.next_station_arrive_time,g_period_msg_from_signal.next_station_arrive_time,20);//打包下一站到达时间
     memcpy(g_period_msg_to_app.next_station_leave_time,g_period_msg_from_signal.next_station_leave_time,20);//打包下一站出发时间
     g_period_msg_to_app.train_work_condition=g_period_msg_from_signal.train_work_condition;
@@ -703,9 +702,9 @@ void RefreshPeriodMsgToAPP()
     {
         g_period_msg_to_app.next_work_level_recommend=0;
     }
-    LogWrite(INFO,"%s:%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d","WebSocketInfoKey",g_current_time,g_period_msg_to_app.current_station_leave_time,g_period_msg_to_app.next_station_arrive_time,g_period_msg_to_app.next_station_leave_time,
-             g_period_msg_to_app.train_work_condition,g_period_msg_to_app.train_work_level,g_period_msg_to_app.train_distance,g_period_msg_to_app.optimize_flag,g_period_msg_to_app.next_speed_recommend,
-             g_period_msg_to_app.next_work_level_recommend,g_period_msg_to_app.next_recommend_countdown,g_period_msg_to_app.next_recommend_distance);
+//    LogWrite(INFO,"%s:%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d","WebSocketInfoKey",g_current_time,g_period_msg_to_app.current_station_leave_time,g_period_msg_to_app.next_station_arrive_time,g_period_msg_to_app.next_station_leave_time,
+//             g_period_msg_to_app.train_work_condition,g_period_msg_to_app.train_work_level,g_period_msg_to_app.train_distance,g_period_msg_to_app.optimize_flag,g_period_msg_to_app.next_speed_recommend,
+//             g_period_msg_to_app.next_work_level_recommend,g_period_msg_to_app.next_recommend_countdown,g_period_msg_to_app.next_recommend_distance);
 
     //LogWrite(INFO,"%s,%s-%d,%s-%d,%s-%d,%s-%d,%s-%d","APP","target_spd",g_speed_plan_info.target_speed,"next_target",g_period_msg_to_app.next_speed_recommend,
     //        "next_level",g_period_msg_to_app.next_work_condition_recommend,"next_cutdown",g_period_msg_to_app.next_recommend_countdown,"next_dis",g_period_msg_to_app.next_recommend_distance);
@@ -749,7 +748,7 @@ UINT16 PackPeriodMsgToAPP(UINT8 *send_buffer)
     index+=2;
     ShortToChar(g_period_msg_to_app.train_speed,send_buffer+index);//打包列车速度
     index+=2;
-    memcpy(send_buffer+index,g_period_msg_to_app.next_station_name,20);//打包下一站名称
+    memcpy(send_buffer+index,g_period_msg_to_app.next_station_name_byte,20);//打包下一站名称
     index+=20;
     memcpy(send_buffer+index,g_period_msg_to_app.next_station_arrive_time,20);//打包下一站到达时间
     index+=10;
@@ -871,7 +870,7 @@ UINT16 PackPeriodMsgToSignal(UINT8 *send_buffer)
     }
 
     limit_speed = GetSpeedLimit(train_head_loc,train_tail_loc);
-    LogWrite(INFO,"%s,%s-%d,%s-%d,%s-%f,%s-%d","DATA","dis",train_head_loc,"target_spd",target_speed,"spd",g_period_msg_from_signal.train_speed,"ebi",limit_speed);
+//    LogWrite(INFO,"%s,%s-%d,%s-%d,%s-%f,%s-%d","MSG_TO_SINGLE","dis",train_head_loc,"target_spd",target_speed,"spd",g_period_msg_from_signal.train_speed,"ebi",limit_speed);
     //printf("dis:%d,target_spd-%d,ebi-%d\n",train_head_loc,target_speed,limit_speed);
     g_speed_plan_info.target_speed=target_speed;
     /*消息打包*/
