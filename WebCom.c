@@ -50,52 +50,102 @@ typedef struct
     bool actionEnd;
 } GetHostName_Struct;
 
+
 static void* ws_getHostThread(void* argv)
 {
-    int32_t ret;
-    //int32_t i;
-    char buf[1024];
-    struct hostent host_body, *host = NULL;
-    struct in_addr **addr_list;
+    struct addrinfo hints, *result, *p;
+    int status;
+    char ipstr[INET6_ADDRSTRLEN];
     GetHostName_Struct *gs = (GetHostName_Struct *)argv;
 
-    /*  此类方法不可重入!  即使关闭线程
-    if((host = gethostbyname(gs->ip)) == NULL)
-    //if((host = gethostbyname2(gs->ip, AF_INET)) == NULL)
-    {
-        gs->actionEnd = true;
-        return NULL;
-    }*/
-    if (gethostbyname_r(gs->ip, &host_body, buf, sizeof(buf), &host, &ret))
-    {
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC; // AF_INET 或 AF_INET6 来强制IPv4或IPv6
+    hints.ai_socktype = SOCK_STREAM;
+
+    if ((status = getaddrinfo(gs->ip, NULL, &hints, &result)) != 0) {
         gs->actionEnd = true;
         return NULL;
     }
 
-    if (host == NULL)
-    {
+    for(p = result; p != NULL; p = p->ai_next) {
+        void *addr;
+
+        // 获取指针指向的地址
+        if (p->ai_family == AF_INET) { // IPv4
+            struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
+            addr = &(ipv4->sin_addr);
+        } else { // IPv6
+            struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)p->ai_addr;
+            addr = &(ipv6->sin6_addr);
+        }
+
+        // 将 IP 地址转换为字符串
+        inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr));
+        break; // 如果只需要第一个地址，则跳出循环
+    }
+
+    freeaddrinfo(result); // 释放链表
+
+    if (p == NULL) { // 没有找到地址
         gs->actionEnd = true;
         return NULL;
     }
 
-    addr_list = (struct in_addr **)host->h_addr_list;
-    // printf("ip name: %s\r\nip list: ", host->h_name);
-    // for(i = 0; addr_list[i] != NULL; i++)
-    //     printf("%s, ", inet_ntoa(*addr_list[i]));
-    // printf("\r\n");
-
-    //一个域名可用解析出多个ip,这里只用了第一个
-    if (addr_list[0] == NULL)
-    {
-        gs->actionEnd = true;
-        return NULL;
-    }
+    // 存储结果
     memset(gs->ip, 0, sizeof(gs->ip));
-    strcpy(gs->ip, (char*)(inet_ntoa(*addr_list[0])));
+    strncpy(gs->ip, ipstr, sizeof(gs->ip));
     gs->result = true;
     gs->actionEnd = true;
+
     return NULL;
 }
+
+//static void* ws_getHostThread(void* argv)
+//{
+//    int32_t ret;
+//    //int32_t i;
+//    char buf[1024];
+//    struct hostent host_body, *host = NULL;
+//    struct in_addr **addr_list;
+//    GetHostName_Struct *gs = (GetHostName_Struct *)argv;
+//
+//    /*  此类方法不可重入!  即使关闭线程
+//    if((host = gethostbyname(gs->ip)) == NULL)
+//    //if((host = gethostbyname2(gs->ip, AF_INET)) == NULL)
+//    {
+//        gs->actionEnd = true;
+//        return NULL;
+//    }*/
+//    if (getaddrinfo(gs->ip, &host_body, buf, sizeof(buf), &host, &ret))  //gethostbyname_r
+//    {
+//        gs->actionEnd = true;
+//        return NULL;
+//    }
+//
+//    if (host == NULL)
+//    {
+//        gs->actionEnd = true;
+//        return NULL;
+//    }
+//
+//    addr_list = (struct in_addr **)host->h_addr_list;
+//    // printf("ip name: %s\r\nip list: ", host->h_name);
+//    // for(i = 0; addr_list[i] != NULL; i++)
+//    //     printf("%s, ", inet_ntoa(*addr_list[i]));
+//    // printf("\r\n");
+//
+//    //一个域名可用解析出多个ip,这里只用了第一个
+//    if (addr_list[0] == NULL)
+//    {
+//        gs->actionEnd = true;
+//        return NULL;
+//    }
+//    memset(gs->ip, 0, sizeof(gs->ip));
+//    strcpy(gs->ip, (char*)(inet_ntoa(*addr_list[0])));
+//    gs->result = true;
+//    gs->actionEnd = true;
+//    return NULL;
+//}
 
 //域名转IP工具,成功返回大于0请求时长ms,失败返回负值的请求时长ms
 int32_t ws_getIpByHostName(const char* hostName, char* retIp, int32_t timeoutMs)

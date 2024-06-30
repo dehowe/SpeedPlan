@@ -1,0 +1,4 @@
+label_flag,rows,columns
+6,1,14
+number,property,propertydisplay,type,length,maxspeed,passengercapacity,weight,basica,basicb,basicc,transformer,converter,gearboxes
+1,commuter_express,ÊÐÓò¿ì¹ì,A,176,140,AW0,337.8,8.4,0.1071,0.00472,0.95,0.98,0.97

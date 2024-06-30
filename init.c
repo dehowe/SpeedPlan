@@ -1147,7 +1147,7 @@ UINT8 DeviceMacDataInit()
                                    "E0:38:2D:4F:FF:F5","E0:38:2D:4F:FF:F6","E0:38:2D:4F:FF:F7","E0:38:2D:4F:FF:F8","E0:38:2D:4F:FF:F9",
                                    "E0:38:2D:4F:FF:FA","E0:38:2D:4F:FF:FB","E0:38:2D:4F:FF:FC","E0:38:2D:4F:FF:FD","E0:38:2D:4F:FF:FE",
                                    "E0:38:2D:4F:FF:FE","E0:38:2D:4F:FF:FF"};
-    g_device_mac_data.device_num=20;
+    g_device_mac_data.device_num=21;
     for (int i = 0; i < g_device_mac_data.device_num; i++)
     {
         memcpy(g_device_mac_data.device_mac_list[i],DATA[i],30);

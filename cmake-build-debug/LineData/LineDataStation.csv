@@ -1,0 +1,12 @@
+label_flag,rows,columns
+1,9,15
+name,number,property,propertydisplay,scheduletime,dwelltime,cumulativetractionenergy,cumulativeregenerativeenergy,actualoperationenergy,begindistanc,enddistance,latitude,latitude_dir,longitude,longitude_dir
+金星站,1,commuter_express,市域快轨,171.149,57,92.94,58.64,34.3,0,4280,39.90744,78,116.41615,69
+黄石站,2,commuter_express,市域快轨,137.973,41.6,55.34,45.04,10.3,4280,7243,39.90744,78,116.46604,69
+市五医院站,3,commuter_express,市域快轨,106.156,38.842,48.38,34.16,14.22,7243,9094,39.90744,78,116.50094,69
+凤溪河站,4,commuter_express,市域快轨,103.309,40.029,67.26,32.1,35.16,9094,11132,39.90744,78,116.52251,69
+温泉大道站,5,commuter_express,市域快轨,101.081,37.659,61.04,16.88,44.16,11132,13106,39.90744,78,116.5464,69
+明光站,6,commuter_express,市域快轨,258.642,37.284,142.4,61.76,80.64,13106,19747,39.90744,78,116.56958,69
+九江北站,7,commuter_express,市域快轨,204.47,37.499,87.92,40.08,47.84,19747,23926,39.90744,78,116.64736,69
+白佛桥站,8,commuter_express,市域快轨,91.747,30,45.38,22.86,22.52,23926,25394,39.90744,78,116.69632,69
+机投桥站,9,commuter_express,市域快轨,0,0,0,0,0,25394,25394,39.90744,78,116.71342,69

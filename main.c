@@ -11,13 +11,17 @@ struct can_filter Can0Filter[FILTER0_NUM] = {{CPU_CAN_ID,CAN_SFF_MASK}};
 int main()
 {
     UINT8 result;
+    char version_label[50] ="v";
+    char version_value[50];
+    sprintf(version_value,"%.1f",VERSION);
+    strcat(version_label,version_value);
     printf("Hello ARM!\n");
-    LogWrite(INFO,"%s","PROGRAM_INIT:start");
+    LogWrite(INFO,"%s-%s","PROGRAM_INIT:start",version_label);
     Rce04aLedEncoderInit();//led初始化
     LightUpLed1();//点亮led1
     //唯一绑定MAC地址 融创 00:04:9f:04:d2:35 本地 00:0c:29:7b:87:2c  实验室 00:04:9f:04:d2:35 现场 e0:38:2d:4f:ff:ff"
-    UINT8 net_mac_loc_num=4;
-    CHAR net_mac_loc[4][32]={"00:04:9f:04:d2:35","00:0c:29:7b:87:2c","00:04:9f:04:d2:35","e0:38:2d:4f:ff:ff"};
+    UINT8 net_mac_loc_num=5;
+    CHAR net_mac_loc[5][32]={"00:04:9f:04:d2:35","00:0c:29:7b:87:2c","00:04:9f:04:d2:35","e0:38:2d:4f:ff:ff","00:0c:29:5f:ca:e7"};
     for (int i=0;i<net_mac_loc_num;i++)
     {
         result=CheckLocMac(net_mac_loc[i]);//检查MAC地址有效性

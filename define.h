@@ -45,9 +45,10 @@ typedef long int            INT64;
 #define LEVEL_MODE                  1               // 级位模式
 #define DISTANCE_ERROR              200             // 允许的定位误差 m
 #define SEPARATE_ON_FLAG            0               // 分相区使用标识 0：无效 1：有效
-#define VERSION                     8.8             // 程序版本
+#define VERSION                     9.0             // 程序版本
 
 // v8.8 add disk check and log file manage
+// v9.0 change code compile version to gcc 4.9.4
 
 #pragma region 曲线优化所需数据结构体定义
 /*列车参数结构体*/

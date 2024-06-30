@@ -150,11 +150,28 @@ void TimeStampToDate(INT64 time_stamp,CHAR *date,UINT16 length)
  *************************************************************************/
 long DateToTimeStamp(CHAR *date)
 {
-    struct tm tm;
-    strptime(date,"%Y-%m-%d %H:%M:%S",&tm);
-    long t= mktime(&tm);
+    struct tm tm = {0};  // 初始化 tm 结构
+    int year, month, day, hour, minute,second;
+    long t = 0;
+    // 解析日期时间字符串
+    // 注意：依据你的日期时间格式，这里可能需要调整 sscanf 的格式字符串
+    if (sscanf(date, "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &minute, &second) == 6)
+    {
+        // struct tm 中的年份是从1900年开始的，月份是从0开始的
+        tm.tm_year = year - 1900;
+        tm.tm_mon = month - 1;
+        tm.tm_mday = day;
+        tm.tm_hour = hour;
+        tm.tm_min = minute;
+        tm.tm_sec = second;  // 假设秒是0
+        tm.tm_isdst = -1;  // 自动检测夏令时
+        t= mktime(&tm);
+    }
+    else
+    {
+        t=0;
+    }
     return t;
-    return 65535;
 }
 
 /*************************************************************************
@@ -821,7 +838,7 @@ void* Rce04aCanMsgThread(void* arg)
 
     while(1)
     {
-        printf("等待接收\n");
+        printf("wait for connect!\n");
         Rce04aCanReadMsgPoll();
         nanosleep(&req, &rem);
     }

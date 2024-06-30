@@ -90,7 +90,7 @@ void SpeedPlanMain()
                     //如果运行方向为下行
                     if(g_direction==DIRECTION_DOWN)
                     {
-                        if(g_speed_plan_info.interval_end_dis<g_speed_plan_info.interval_begin_dis)
+                        if(g_speed_plan_info.interval_end_dis<=g_speed_plan_info.interval_begin_dis)
                         {
                             data_error_flag=1;
                             printf("SPEED_PLAN:error code 2!");
@@ -113,7 +113,7 @@ void SpeedPlanMain()
                     else
                     {
                         g_speed_plan_info.target_time=(UINT32)g_static_data_csv.station_csv.schedule_time[i];
-                        if(g_speed_plan_info.interval_end_dis>g_speed_plan_info.interval_begin_dis)
+                        if(g_speed_plan_info.interval_end_dis>=g_speed_plan_info.interval_begin_dis)
                         {
                             data_error_flag=1;
                             printf("SPEED_PLAN:error code 4!");
