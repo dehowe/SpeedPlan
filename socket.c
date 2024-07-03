@@ -307,6 +307,22 @@ UINT32 LongFromChar(const UINT8 *input)
 }
 
 /*************************************************************************
+ * 功能描述: 将4字节数据流变为UINT32(Little Endian)
+ * 输入参数: input 输入
+ * 输出参数: 无
+ * 返回值:   UINT32数据
+ *************************************************************************/
+UINT32 LongFromCharLittle(const UINT8 *input)
+{
+    UINT32 temp;
+    temp = (*(input + 3));         // 最高位字节
+    temp = (temp << 8) + (*(input + 2));
+    temp = (temp << 8) + (*(input + 1));
+    temp = (temp << 8) + (*input); // 最低位字节
+    return temp;
+}
+
+/*************************************************************************
  * 功能描述: 将UINT16变为2字节数据流
  * 输入参数: input  UINT16数据
  * 输出参数: output 2字节数组
@@ -332,122 +348,6 @@ void LongToChar(UINT32 input, UINT8 *output)
     *(output + 3) = (UINT8)(input & 0xFF);
 }
 
-/*************************************************************************
- * 功能描述: 解包来自车辆网络的消息
- * 输入参数: UINT8  *receive_buffer  消息存储指针
- *          UINT16 receive_length  消息长度
- * 输出参数: 无
- * 返回值:   UINT8   result          1：解析成功 0：解析失败
- *************************************************************************/
-UINT8 UnpackePeriodMsgFromTrainNet(UINT8 *receive_buffer,UINT16 receive_length)
-{
-    UINT8 result=0;
-    UINT8 *index=receive_buffer;
-    UINT16 message_id = ShortFromChar(index);//解析消息长度
-    index+=2;
-    UINT16 message_length = ShortFromChar(index);//解析消息长度
-    index+=2;
-    //消息头校验
-    if (message_id==101&&message_length==receive_length)
-    {
-        memset(&g_period_msg_from_train,0,sizeof(g_period_msg_from_train));//清空存储结构体
-        g_period_msg_from_train.train_weight=ShortFromChar(index);//解析列车实时载荷
-        index+=2;
-        g_period_msg_from_train.formation_num = *(index++);//解析列车编组数量
-        g_period_msg_from_train.train_length=ShortFromChar(index);//解析列车长度
-        index+=2;
-        g_period_msg_from_train.traction_voltage_2= LongFromChar(index);//解析列车牵引电压
-        index+=4;
-        g_period_msg_from_train.traction_current_2= LongFromChar(index);//解析列车牵引电流
-        index+=4;
-        g_period_msg_from_train.traction_current_sign=*(index++);//解析列车牵引电流符号
-        g_period_msg_from_train.traction_fault_flag=*(index++);//解析列车牵引故障标识
-        g_period_msg_from_train.brake_fault_flag=*(index++);//解析列车制动故障标识
-        g_period_msg_from_train.other_fault_flag=*(index++);//解析列车其他故障标识
-        //自更新变量
-        if (g_period_msg_from_train.traction_current_sign==1)
-        {
-            g_period_msg_from_train.traction_energy_sum+=CalEnergyByUI(g_period_msg_from_train.traction_voltage_2,g_period_msg_from_train.traction_current_2,0.2f);
-        }
-        else
-        {
-            g_period_msg_from_train.brake_energy_sum+=CalEnergyByUI(g_period_msg_from_train.traction_voltage_2,g_period_msg_from_train.traction_current_2,0.2f);
-        }
-
-        //解析实时数据
-        //memset(&g_period_msg_from_signal,0,sizeof(g_period_msg_from_signal));//清空存储结构体
-        g_period_msg_from_signal.traction_energy= LongFromChar(index);//解析列车当前区间累积牵引能耗
-        index+=4;
-        g_period_msg_from_signal.regeneration_energy= LongFromChar(index);//解析列车当前区间累积再生能量
-        index+=4;
-        g_period_msg_from_signal.train_direction=*(index++);//解析列车运行方向
-        g_period_msg_from_signal.train_id= LongFromChar(index);//解析列车车次号
-        index+=4;
-        g_period_msg_from_signal.train_number= LongFromChar(index);//解析列车车组号
-        index+=4;
-        g_period_msg_from_signal.arrive_flag=*(index++);//解析停准停稳标识
-        g_period_msg_from_signal.leave_flag=*(index++);//解析允许发车标识
-        g_period_msg_from_signal.door_flag=*(index++);//解析车门状态
-        g_period_msg_from_signal.train_plan_flag=*(index++);//解析列车运行计划更新标识
-        g_period_msg_from_signal.train_ebi=ShortFromChar(index);//解析ATP防护速度
-        index+=2;
-        g_period_msg_from_signal.train_speed=ShortFromChar(index);//解析列车实时速度
-        index+=2;
-//        memcpy(g_period_msg_from_signal.next_staion_name,index,20);//解析下一到达站名称
-//        index+=20;
-//        g_period_msg_from_signal.next_station_id=ShortFromChar(index);//解析下一站编号
-        index+=2;
-        memcpy(g_period_msg_from_signal.next_station_arrive_time,index,20);//解析下一站到达时间
-        index+=20;
-        memcpy(g_period_msg_from_signal.next_station_leave_time,index,20);//解析下一站发车时间
-        index+=20;
-        g_period_msg_from_signal.train_work_condition=*(index++);//解析列车实时工况
-        g_period_msg_from_signal.train_work_level=*(index++);//解析列车实时级位
-        g_period_msg_from_signal.train_distance_last=g_period_msg_from_signal.train_distance;//保存上周期公里标
-        g_period_msg_from_signal.train_distance= LongFromChar(index);//解析列车公里标
-        index+=4;
-        memcpy(g_period_msg_from_signal.train_time,index,20);//解析列车当前时间
-        index+=20;
-        g_period_msg_from_signal.longitude_value_last=g_period_msg_from_signal.longitude_value;//保存上周期
-        g_period_msg_from_signal.longitude_direction_last=g_period_msg_from_signal.longitude_direction;//保存上周期
-        g_period_msg_from_signal.latitude_value_last=g_period_msg_from_signal.latitude_value;//保存上周期
-        g_period_msg_from_signal.latitude_direction_last=g_period_msg_from_signal.latitude_direction;//保存上周期
-
-        g_period_msg_from_signal.longitude_value= LongFromChar(index);//解析GPS经度
-        index+=4;
-        g_period_msg_from_signal.longitude_direction=*(index++);//解析GPS经度方向
-        g_period_msg_from_signal.latitude_value= LongFromChar(index);//解析GPS纬度
-        index+=4;
-        g_period_msg_from_signal.latitude_direction=*(index++);//解析GPS纬度方向
-
-        g_period_msg_from_signal.temporary_limit_num=ShortFromChar(index);//解析临时限速数量
-        index+=2;
-        for(int i=0;i<g_period_msg_from_signal.temporary_limit_num;i++)
-        {
-            g_period_msg_from_signal.temporary_limit_begin_distance[i]=LongFromChar(index);//解析临时限速起始公里标
-            index+=4;
-            g_period_msg_from_signal.temporary_limit_end_distance[i]=LongFromChar(index);//解析临时限速结束公里标
-            index+=4;
-            g_period_msg_from_signal.temporary_limit_value[i]=ShortFromChar(index);//解析临时限速值
-            index+=2;
-        }
-        //全局变量更新
-        if(g_period_msg_from_signal.train_time[0]!=0)
-        {
-            memcpy(g_current_time,g_period_msg_from_signal.train_time,20);//解析列车当前时间
-        }
-        g_direction=g_period_msg_from_signal.train_direction;
-        GetCurrentDistance();//更新当前公里标
-        GetCurrentPlan();//更新下一站
-        //printf("dis:%d\n",g_period_msg_from_signal.train_distance);
-        LogWrite(INFO,"%s-%d,%s-%d,%s-%d,%s-%d,%s-%d,%s-%d,%s-%d,%s-%d","ENERGY",DateToTimeStamp(g_current_time),"door",g_period_msg_from_signal.door_flag,"spd",g_period_msg_from_signal.train_speed,
-                 "dis",g_period_msg_from_signal.train_distance,"lng",g_period_msg_from_signal.longitude_value,"lng_dir",g_period_msg_from_signal.longitude_direction,"lat",g_period_msg_from_signal.latitude_value,
-                 "lat_dir",g_period_msg_from_signal.latitude_direction);
-        result = 1;//解析成功
-        return result;
-    }
-    return result;
-}
 
 /*************************************************************************
  * 功能描述: 解包来自信号系统消息

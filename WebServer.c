@@ -931,10 +931,10 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
 
     //临时限速信息
     //2车牵引机组输入电压
-    sprintf(temp,"%d",g_period_msg_from_train.traction_voltage_2);
+    sprintf(temp,"%d",g_period_msg_from_train.traction_voltage);
     cJSON_AddStringToObject(pRoot,"traction_voltage_2",temp);
     //3车牵引机组输入电压
-    sprintf(temp,"%d",g_period_msg_from_train.traction_voltage_3);
+    sprintf(temp,"%d",g_period_msg_from_train.traction_voltage);
     cJSON_AddStringToObject(pRoot,"traction_voltage_3",temp);
     //2车牵引机组输入电流
     sprintf(temp,"%d",g_period_msg_from_train.traction_current_2);

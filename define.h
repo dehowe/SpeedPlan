@@ -49,6 +49,10 @@ typedef long int            INT64;
 
 // v8.8 add disk check and log file manage
 // v9.0 change code compile version to gcc 4.9.4
+// v9.1 1. Modify the voltage and current according to the 4-byte analysis, and do not distinguish between 2 and 3 cars
+//      2. Modify the longitude and latitude according to the little-end analysis
+//      3. Modify the load conversion and do not process it
+//      4. Modify the train number and car group number to print, and fill the zero at the left end of the corresponding digits
 
 #pragma region 曲线优化所需数据结构体定义
 /*列车参数结构体*/
@@ -353,10 +357,8 @@ typedef struct
     UINT16 train_weight;         /*列车实时载荷 t*/
     UINT8 formation_num;         /*编组数量*/
     UINT16 train_length;         /*列车长度 m*/
-    UINT16 traction_voltage_2;     /*2车牵引机组输入电压 V*/
-    UINT16 traction_voltage_3;          /*3车牵引机组输入电压 V*/
-    UINT16 traction_voltage_side_2;     /*2车牵引机组输入电压 副边 V*/
-    UINT16 traction_voltage_side_3;     /*3车牵引机组输入电压 副边 V*/
+    UINT32 traction_voltage;      /*牵引机组输入电压 V*/
+    UINT16 traction_voltage_side;     /*牵引机组输入电压 副边 V*/
     UINT16 traction_current_2;          /*2车牵引机组输入电流 A*/
     UINT16 traction_current_3;          /*3车牵引机组输入电流 A*/
     UINT16 traction_current_low_2;     /*2车牵引机组输入低压侧电流 A*/

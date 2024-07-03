@@ -467,19 +467,16 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
     //消息头校验
     if (message_id==101&&message_length==receive_length)
     {
-        g_period_msg_from_train.train_weight=ShortFromChar(index)*100;//解析列车实时载荷
+        g_period_msg_from_train.train_weight=ShortFromChar(index);//解析列车实时载荷
         index+=2;
         g_period_msg_from_train.formation_num = *(index++);//解析列车编组数量
         g_period_msg_from_train.train_length=ShortFromChar(index);//解析列车长度
         index+=2;
-        g_period_msg_from_train.traction_voltage_2= ShortFromChar(index);//解析2车（原边）牵引电压
-        index+=2;
-        g_period_msg_from_train.traction_voltage_3= ShortFromChar(index);//解析3车（原边）牵引电压
-        index+=2;
-        g_period_msg_from_train.traction_voltage_side_2= ShortFromChar(index);//解析2车（副边）牵引电压
-        index+=2;
-        g_period_msg_from_train.traction_voltage_side_3= ShortFromChar(index);//解析3车（副边）牵引电压
-        index+=2;
+        g_period_msg_from_train.traction_voltage= LongFromChar(index);//解析（原边）牵引电压
+        index+=4;
+//        g_period_msg_from_train.traction_voltage_side= LongFromChar(index);//解析（副边）牵引电压
+        g_period_msg_from_train.traction_voltage_side= (UINT32)(1.0*g_period_msg_from_train.traction_voltage / 25000 * 970);
+        index+=4;
         g_period_msg_from_train.traction_current_2= ShortFromChar(index);//解析2车（原边）牵引电流
         index+=2;
         g_period_msg_from_train.traction_current_3= ShortFromChar(index);//解析3车（原边）牵引电流
@@ -493,20 +490,21 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         g_period_msg_from_train.brake_fault_flag=*(index++);//解析列车制动故障标识
         g_period_msg_from_train.other_fault_flag=*(index++);//解析列车其他故障标识
         //自更新变量
+        UINT16 traction_current = g_period_msg_from_train.traction_current_2 + g_period_msg_from_train.traction_current_3;
         if (g_period_msg_from_train.traction_current_sign==1)
         {
-            g_period_msg_from_train.traction_energy_sum+=CalEnergyByUI(g_period_msg_from_train.traction_voltage_2,g_period_msg_from_train.traction_current_2,0.2f);
+            g_period_msg_from_train.traction_energy_sum+=CalEnergyByUI(g_period_msg_from_train.traction_voltage,traction_current,0.2f);
         }
         else if (g_period_msg_from_train.traction_current_sign==2)
         {
-            g_period_msg_from_train.brake_energy_sum+=CalEnergyByUI(g_period_msg_from_train.traction_voltage_2,g_period_msg_from_train.traction_current_2,0.2f);
+            g_period_msg_from_train.brake_energy_sum+=CalEnergyByUI(g_period_msg_from_train.traction_voltage,traction_current,0.2f);
         }
 //        LogWrite(INFO,"%s:%s,%s-%d,%s-%d,%s-%d,%s-%d","ENERGY:",g_current_time,"work",g_period_msg_from_signal.train_work_condition,"spd",g_period_msg_from_signal.train_speed,
 //                 "dis",g_period_msg_from_signal.train_distance,"target_spd",g_speed_plan_info.target_speed);
         //解析实时数据
-        g_period_msg_from_signal.traction_energy= LongFromChar(index);//解析列车当前区间累积牵引能耗
+        g_period_msg_from_signal.traction_energy= LongFromChar(index);//解析列车累积牵引能耗
         index+=4;
-        g_period_msg_from_signal.regeneration_energy= LongFromChar(index);//解析列车当前区间累积再生能量
+        g_period_msg_from_signal.regeneration_energy= LongFromChar(index);//解析列车累积再生能量
         index+=4;
         g_period_msg_from_signal.train_direction=*(index++);//解析列车运行方向
         g_period_msg_from_signal.train_id= TrainIDFromChar(index);//解析车次号
@@ -552,12 +550,12 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         //g_period_msg_from_signal.train_distance= LongFromChar(index);//解析列车公里标
         index+=4;
         g_period_msg_from_signal.longitude_value_last=g_period_msg_from_signal.longitude_value;//保存上周期数据
-        g_period_msg_from_signal.longitude_value= LongFromChar(index);//解析经度
+        g_period_msg_from_signal.longitude_value= LongFromCharLittle(index);//解析经度
         index+=4;
         g_period_msg_from_signal.longitude_direction_last=g_period_msg_from_signal.longitude_direction;//保存上周期数据
         g_period_msg_from_signal.longitude_direction=*(index++);//解析经度方向
         g_period_msg_from_signal.latitude_value_last=g_period_msg_from_signal.latitude_value;//保存上周期数据
-        g_period_msg_from_signal.latitude_value= LongFromChar(index);//解析纬度
+        g_period_msg_from_signal.latitude_value= LongFromCharLittle(index);//解析纬度
         index+=4;
         g_period_msg_from_signal.latitude_direction_last=g_period_msg_from_signal.latitude_direction;//保存上周期数据
         g_period_msg_from_signal.latitude_direction=*(index++);//解析纬度方向
@@ -620,11 +618,14 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         {
             snprintf(hexString+4*(m/2),sizeof (hexString)-4*(m/2),"%02X%02X",(unsigned char )record[m],(unsigned char )record[m+1]);
         }
-        LogWrite(INFO,"%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%f,%s,%d,%d,%d,%d,%d,%d,%d,%s","CAN_MSG",g_current_time,g_period_msg_from_train.train_weight,g_period_msg_from_train.formation_num,g_period_msg_from_train.train_length,g_period_msg_from_train.traction_voltage_2,
-                 g_period_msg_from_train.traction_voltage_3,g_period_msg_from_train.traction_voltage_side_2,g_period_msg_from_train.traction_voltage_side_3,g_period_msg_from_train.traction_current_2,g_period_msg_from_train.traction_current_3,
+        char trainID[20],trainNum[20];
+        sprintf(trainID, "%06d", g_period_msg_from_signal.train_id);
+        sprintf(trainNum, "%04d", g_period_msg_from_signal.train_number);
+        LogWrite(INFO,"%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%d,%d,%d,%d,%d,%f,%s,%d,%d,%d,%d,%d,%d,%d,%s","CAN_MSG",g_current_time,g_period_msg_from_train.train_weight,g_period_msg_from_train.formation_num,
+                 g_period_msg_from_train.train_length,g_period_msg_from_train.traction_voltage,g_period_msg_from_train.traction_voltage_side,g_period_msg_from_train.traction_current_2,g_period_msg_from_train.traction_current_3,
                  g_period_msg_from_train.traction_current_low_2,g_period_msg_from_train.traction_current_low_3,g_period_msg_from_train.traction_current_sign,g_period_msg_from_train.traction_fault_flag,g_period_msg_from_train.brake_fault_flag,
                  g_period_msg_from_train.other_fault_flag,g_period_msg_from_train.traction_energy_sum,g_period_msg_from_train.brake_energy_sum,g_period_msg_from_signal.traction_energy,g_period_msg_from_signal.regeneration_energy,
-                 g_period_msg_from_signal.train_direction,g_period_msg_from_signal.train_id,g_period_msg_from_signal.train_number,g_period_msg_from_signal.arrive_flag,g_period_msg_from_signal.leave_flag,g_period_msg_from_signal.byte_data,
+                 g_period_msg_from_signal.train_direction,trainID,trainNum,g_period_msg_from_signal.arrive_flag,g_period_msg_from_signal.leave_flag,g_period_msg_from_signal.byte_data,
                  g_period_msg_from_signal.train_plan_flag,g_period_msg_from_signal.train_ebi,g_period_msg_from_signal.train_speed,g_period_msg_from_signal.train_time,g_period_msg_from_signal.train_work_speed,g_period_msg_from_signal.train_work_level,
                  g_period_msg_from_signal.longitude_value,g_period_msg_from_signal.longitude_direction,g_period_msg_from_signal.latitude_value,g_period_msg_from_signal.latitude_direction,g_period_msg_from_train.train_fault_code,hexString);
 
