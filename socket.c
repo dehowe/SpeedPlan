@@ -564,6 +564,7 @@ void RefreshPeriodMsgToAPP()
     g_period_msg_to_app.traction_energy=g_period_msg_from_signal.traction_energy;
     g_period_msg_to_app.regeneration_energy=g_period_msg_from_signal.regeneration_energy;
     g_period_msg_to_app.train_direction=g_direction;
+    memcpy(g_period_msg_to_app.train_id_letter,g_period_msg_from_signal.train_id_letter,4);
     g_period_msg_to_app.train_id=g_period_msg_from_signal.train_id;
     g_period_msg_to_app.train_number=g_period_msg_from_signal.train_number;
     g_period_msg_to_app.arrive_flag=g_period_msg_from_signal.arrive_flag;

@@ -103,8 +103,6 @@ void TrainBitDataFromChar(const UINT8 input)
     }
 }
 
-
-
 /*************************************************************************
   * 功能描述: 从数据流中提取时间
   * 输入参数: input 输入
@@ -139,6 +137,25 @@ void TimeStampToDate(INT64 time_stamp,CHAR *date,UINT16 length)
     struct tm *p;
     p= gmtime(&t);
     strftime(date,length,"%Y-%m-%d %H:%M:%S",p);
+}
+
+
+// 大端转小端或者小端转大端
+void SwapEndian(CHAR* value) {
+    CHAR temp = value[0];
+    value[0] = value[1];
+    value[1] = temp;
+}
+void ChangeByteOrder(CHAR* data) {
+    for (int i = 0; i < 16; i+=2) {
+        SwapEndian(data+i);
+    }
+}
+void PrintBytes(const UINT8* data, size_t size) {
+    for (size_t i = 0; i < size; ++i) {
+        printf("%02x ", data[i]);
+    }
+    printf("\n");
 }
 
 /*************************************************************************
@@ -467,15 +484,15 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
     //消息头校验
     if (message_id==101&&message_length==receive_length)
     {
-        g_period_msg_from_train.train_weight=ShortFromChar(index);//解析列车实时载荷
+        g_period_msg_from_train.train_weight=(FLOAT32)ShortFromChar(index)/100;//解析列车实时载荷
         index+=2;
         g_period_msg_from_train.formation_num = *(index++);//解析列车编组数量
         g_period_msg_from_train.train_length=ShortFromChar(index);//解析列车长度
         index+=2;
-        g_period_msg_from_train.traction_voltage= LongFromChar(index);//解析（原边）牵引电压
+        g_period_msg_from_train.traction_voltage= (FLOAT32)LongFromChar(index)/10;//解析（原边）牵引电压
         index+=4;
 //        g_period_msg_from_train.traction_voltage_side= LongFromChar(index);//解析（副边）牵引电压
-        g_period_msg_from_train.traction_voltage_side= (UINT32)(1.0*g_period_msg_from_train.traction_voltage / 25000 * 970);
+        g_period_msg_from_train.traction_voltage_side= g_period_msg_from_train.traction_voltage / 25000 * 970;
         index+=4;
         g_period_msg_from_train.traction_current_2= ShortFromChar(index);//解析2车（原边）牵引电流
         index+=2;
@@ -507,7 +524,13 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         g_period_msg_from_signal.regeneration_energy= LongFromChar(index);//解析列车累积再生能量
         index+=4;
         g_period_msg_from_signal.train_direction=*(index++);//解析列车运行方向
-        g_period_msg_from_signal.train_id= TrainIDFromChar(index);//解析车次号
+
+        //解析车次号
+        g_period_msg_from_signal.train_id_letter[0] = *(index++);
+        g_period_msg_from_signal.train_id_letter[1] = *(index++);
+        g_period_msg_from_signal.train_id_letter[2] = *(index++);
+        g_period_msg_from_signal.train_id_letter[3] = *(index++);
+        g_period_msg_from_signal.train_id= TrainIDFromChar(index);
         index+=6;
         g_period_msg_from_signal.train_number= TrainNumberFromChar(index);//解析车组号
         index+=4;
@@ -520,7 +543,7 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         g_period_msg_from_signal.train_ebi=ShortFromChar(index);//解析ATP防护速度
         index+=2;
         g_period_msg_from_signal.train_speed_last=g_period_msg_from_signal.train_speed;//保存上周期速度数据
-        g_period_msg_from_signal.train_speed=(FLOAT32)ShortFromChar(index)*1.0/100;//解析列车实时速度
+        g_period_msg_from_signal.train_speed=(FLOAT32)ShortFromChar(index)/100;//解析列车实时速度
         index+=2;
         //g_period_msg_from_signal.next_station_id=ShortFromChar(index);//解析下一站编号
         index+=2;
@@ -543,7 +566,7 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         }
         else
         {
-            g_period_msg_from_signal.train_work_level=ShortFromChar(index)*10;
+            g_period_msg_from_signal.train_work_level=(FLOAT32)ShortFromChar(index)/10;
         }
         index+=2;
         //g_period_msg_from_signal.train_distance_last=g_period_msg_from_signal.train_distance;//保存上周期公里标
@@ -566,19 +589,26 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         int dstlen = 100;
         int ret;
         char record[48];
-        memcpy(in,index,16);
+        char temp[16];
+        memcpy(temp,index,16);
+        ChangeByteOrder(temp);
+        memcpy(in,temp,16);
         memcpy(record,in,16);
         memcpy(g_period_msg_from_signal.current_station_name_GBK,record,16);
 //        ret = CodeConvertGBKToUTF8(in,srclen,dst,dstlen);
 //        memcpy(g_period_msg_from_signal.current_station_name,dst,dstlen);
         index+=16;
-        memcpy(in,index,16);
+        memcpy(temp,index,16);
+        ChangeByteOrder(temp);
+        memcpy(in,temp,16);
         memcpy(record+16,in,16);
         memcpy(g_period_msg_from_signal.next_station_name_GBK,in,dstlen);
 //        ret = CodeConvertGBKToUTF8(in,srclen,dst,dstlen);
 //        memcpy(g_period_msg_from_signal.next_station_name,dst,dstlen);
         index+=16;
-        memcpy(in,index,16);
+        memcpy(temp,index,16);
+        ChangeByteOrder(temp);
+        memcpy(in,temp,16);
         memcpy(record+32,in,16);
         memcpy(g_period_msg_from_signal.dst_station_name_GBK,in,dstlen);
 //        ret = CodeConvertGBKToUTF8(in,srclen,dst,dstlen);
@@ -587,7 +617,6 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         g_period_msg_from_train.train_fault_code= ShortFromChar(index);
         index+=2;
         //校验位
-        index+=4;
         UINT8 check_rec=*(index++);
         UINT32 byte_sum=0;
         for(int i=0;i<receive_length-2;i++)
@@ -618,15 +647,23 @@ UINT8 UnpackePeriodMsgFromCAN(UINT8 *receive_buffer,UINT16 receive_length)
         {
             snprintf(hexString+4*(m/2),sizeof (hexString)-4*(m/2),"%02X%02X",(unsigned char )record[m],(unsigned char )record[m+1]);
         }
-        char trainID[20],trainNum[20];
+        char trainID[20],trainNum[20],trainSpd[20],voltage[20],voltageSide[20],weight[20],level[20];
         sprintf(trainID, "%06d", g_period_msg_from_signal.train_id);
         sprintf(trainNum, "%04d", g_period_msg_from_signal.train_number);
-        LogWrite(INFO,"%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%d,%d,%d,%d,%d,%f,%s,%d,%d,%d,%d,%d,%d,%d,%s","CAN_MSG",g_current_time,g_period_msg_from_train.train_weight,g_period_msg_from_train.formation_num,
-                 g_period_msg_from_train.train_length,g_period_msg_from_train.traction_voltage,g_period_msg_from_train.traction_voltage_side,g_period_msg_from_train.traction_current_2,g_period_msg_from_train.traction_current_3,
+        sprintf(weight, "%.2f", g_period_msg_from_train.train_weight);
+        sprintf(voltage, "%.1f", g_period_msg_from_train.traction_voltage);
+        sprintf(voltageSide, "%.1f", g_period_msg_from_train.traction_voltage_side);
+        sprintf(level, "%.1f", g_period_msg_from_signal.train_work_level);
+        sprintf(trainSpd, "%.2f", g_period_msg_from_signal.train_speed);
+
+
+
+        LogWrite(INFO,"%s,%s,%s,%d,%d,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%d,%d,%d,%d,%d,%s,%s,%d,%s,%d,%d,%d,%d,%d,%s","CAN_MSG",g_current_time,weight,g_period_msg_from_train.formation_num,
+                 g_period_msg_from_train.train_length,voltage,voltageSide,g_period_msg_from_train.traction_current_2,g_period_msg_from_train.traction_current_3,
                  g_period_msg_from_train.traction_current_low_2,g_period_msg_from_train.traction_current_low_3,g_period_msg_from_train.traction_current_sign,g_period_msg_from_train.traction_fault_flag,g_period_msg_from_train.brake_fault_flag,
                  g_period_msg_from_train.other_fault_flag,g_period_msg_from_train.traction_energy_sum,g_period_msg_from_train.brake_energy_sum,g_period_msg_from_signal.traction_energy,g_period_msg_from_signal.regeneration_energy,
                  g_period_msg_from_signal.train_direction,trainID,trainNum,g_period_msg_from_signal.arrive_flag,g_period_msg_from_signal.leave_flag,g_period_msg_from_signal.byte_data,
-                 g_period_msg_from_signal.train_plan_flag,g_period_msg_from_signal.train_ebi,g_period_msg_from_signal.train_speed,g_period_msg_from_signal.train_time,g_period_msg_from_signal.train_work_speed,g_period_msg_from_signal.train_work_level,
+                 g_period_msg_from_signal.train_plan_flag,g_period_msg_from_signal.train_ebi,trainSpd,g_period_msg_from_signal.train_time,g_period_msg_from_signal.train_work_speed,level,
                  g_period_msg_from_signal.longitude_value,g_period_msg_from_signal.longitude_direction,g_period_msg_from_signal.latitude_value,g_period_msg_from_signal.latitude_direction,g_period_msg_from_train.train_fault_code,hexString);
 
         result = 1;//解析成功

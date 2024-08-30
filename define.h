@@ -45,7 +45,7 @@ typedef long int            INT64;
 #define LEVEL_MODE                  1               // 级位模式
 #define DISTANCE_ERROR              200             // 允许的定位误差 m
 #define SEPARATE_ON_FLAG            0               // 分相区使用标识 0：无效 1：有效
-#define VERSION                     9.0             // 程序版本
+#define VERSION                     9.3             // 程序版本
 
 // v8.8 add disk check and log file manage
 // v9.0 change code compile version to gcc 4.9.4
@@ -53,6 +53,11 @@ typedef long int            INT64;
 //      2. Modify the longitude and latitude according to the little-end analysis
 //      3. Modify the load conversion and do not process it
 //      4. Modify the train number and car group number to print, and fill the zero at the left end of the corresponding digits
+// v9.2 1. Change the data type of load, primary voltage, secondary voltage, and stage to FLOAT32, and fix the conversion error
+//      2. Modify the log printing of load, primary side voltage, secondary side voltage, level and speed, and print it according to the corresponding decimal place output
+// v9.3 1. Modify the GBK code of the current station, next station, and destination station of the CAN interface to be parsed according to the small end
+//      2. Add the parsing of the first 4 letters of the train number to the CAN interface and remove the reserved 4 bytes
+//      3. Update the primary voltage, secondary voltage variables, and field names of front-end interface 204
 
 #pragma region 曲线优化所需数据结构体定义
 /*列车参数结构体*/
@@ -354,11 +359,11 @@ typedef struct  {
 /*车辆网络->主设备周期数据结构体*/
 typedef struct
 {
-    UINT16 train_weight;         /*列车实时载荷 t*/
+    FLOAT32 train_weight;         /*列车实时载荷 t*/
     UINT8 formation_num;         /*编组数量*/
     UINT16 train_length;         /*列车长度 m*/
-    UINT32 traction_voltage;      /*牵引机组输入电压 V*/
-    UINT16 traction_voltage_side;     /*牵引机组输入电压 副边 V*/
+    FLOAT32 traction_voltage;      /*牵引机组输入电压 V*/
+    FLOAT32 traction_voltage_side;     /*牵引机组输入电压 副边 V*/
     UINT16 traction_current_2;          /*2车牵引机组输入电流 A*/
     UINT16 traction_current_3;          /*3车牵引机组输入电流 A*/
     UINT16 traction_current_low_2;     /*2车牵引机组输入低压侧电流 A*/
@@ -379,6 +384,7 @@ typedef struct
     UINT32 traction_energy;      /*累计牵引能耗 100kwh*/
     UINT32 regeneration_energy;  /*累计再生能量能 100kwh*/
     UINT8 train_direction;       /*列车运行方向 1:上行 0:下行*/
+    UINT8 train_id_letter[4];     /*列车车次号letter*/
     UINT32 train_id;             /*列车车次号*/
     UINT32 train_number;         /*列车车组号*/
     UINT8 arrive_flag;           /*停准停稳标志 1:停准停稳 0:其他*/
@@ -409,7 +415,7 @@ typedef struct
     UINT8 next_station_arrive_time[20];  /*下一站到达时间*/
     UINT8 next_station_leave_time[20];   /*下一站出发时间*/
     UINT8 train_work_condition;            /*列车工况 1:牵引  2:惰行 3:制动 4:无效*/
-    UINT16 train_work_level;              /*列车级位 级位模式有效*/
+    FLOAT32 train_work_level;              /*列车级位 级位模式有效*/
     UINT16 train_work_speed;              /*目标速度km/h 速度模式有效*/
     UINT32 train_distance;               /*列车公里标 m*/
     FLOAT64 train_distance_double;
@@ -469,6 +475,7 @@ typedef struct
     UINT32 traction_energy;     /*累计牵引能耗 100kwh*/
     UINT16 regeneration_energy; /*累计再生能量能 100kwh*/
     UINT8 train_direction;      /*列车运行方向 1:上行 0:下行*/
+    UINT8 train_id_letter[4];      /*列车车次号letter*/
     UINT32 train_id;            /*列车车次号*/
     UINT32 train_number;        /*列车车组号*/
     UINT8 arrive_flag;          /*停准停稳标志 1:停准停稳 0:其他*/

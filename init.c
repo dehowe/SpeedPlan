@@ -1126,7 +1126,7 @@ UINT32 CalEnergyByMode(UINT16 speed,UINT8 level_flag,UINT8 level_output,UINT32 d
  * 输出参数: 无
  * 返回值:  UINT32 焦耳
  *************************************************************************/
-UINT32 CalEnergyByUI(UINT32 voltage,UINT32 current,FLOAT32 cycle_time)
+UINT32 CalEnergyByUI(FLOAT32 voltage,UINT32 current,FLOAT32 cycle_time)
 {
     UINT32 W; //焦耳
     W=(UINT32)(1.0*voltage*current*cycle_time);

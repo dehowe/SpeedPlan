@@ -822,8 +822,16 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
     sprintf(temp,"%d",g_period_msg_to_app.train_direction);
     cJSON_AddStringToObject(pRoot,"direction",temp);
     //当前车次号
-    sprintf(temp,"%d",g_period_msg_to_app.train_id);
-    cJSON_AddStringToObject(pRoot,"train_id",temp);
+    CHAR letter[5];
+    CHAR finally_train_id[50];
+    UINT16 num = sizeof(g_period_msg_to_app.train_id_letter);
+    for (int i = 0; i < num; ++i) {
+        letter[i] = (CHAR)g_period_msg_to_app.train_id_letter[i];
+    }
+    letter[num] = '\0';
+    strcpy(finally_train_id,letter);
+    sprintf(finally_train_id + strlen(letter),"%d",g_period_msg_to_app.train_id);
+    cJSON_AddStringToObject(pRoot,"train_id",finally_train_id);
     //车组号
     sprintf(temp,"%d",g_period_msg_to_app.train_number);
     cJSON_AddStringToObject(pRoot,"train_number",temp);
@@ -931,11 +939,11 @@ UINT16 PackPeriodJsonDataToApp(char* json_data)
 
     //临时限速信息
     //2车牵引机组输入电压
-    sprintf(temp,"%d",g_period_msg_from_train.traction_voltage);
-    cJSON_AddStringToObject(pRoot,"traction_voltage_2",temp);
+    sprintf(temp,"%f",g_period_msg_from_train.traction_voltage);
+    cJSON_AddStringToObject(pRoot,"traction_voltage_pr",temp);
     //3车牵引机组输入电压
-    sprintf(temp,"%d",g_period_msg_from_train.traction_voltage);
-    cJSON_AddStringToObject(pRoot,"traction_voltage_3",temp);
+    sprintf(temp,"%f",g_period_msg_from_train.traction_voltage_side);
+    cJSON_AddStringToObject(pRoot,"traction_voltage_se",temp);
     //2车牵引机组输入电流
     sprintf(temp,"%d",g_period_msg_from_train.traction_current_2);
     cJSON_AddStringToObject(pRoot,"traction_current_2",temp);
